@@ -1,16 +1,11 @@
 local _, a = ...
 
-
 -----------
 -- test!
 ----------------
 
-
 function a.hello()
-    local a = "";
-
+    local a = ""
 end
 
-
-
-local foo = {};
+local foo = {}
