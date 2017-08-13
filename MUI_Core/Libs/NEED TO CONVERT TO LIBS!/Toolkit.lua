@@ -212,6 +212,8 @@ do
 
         local prototype_metatable = {
             __index = function(instance, key)
+
+                --//! This is checking if Class has key, and instance does not directly link to it
                 if (prototype[key] and tk.type(prototype[key]) == "function") then
                     if (key == "GetData") then return nil; end
                     local data = prototype_data.instance[tk.tostring(instance)];
