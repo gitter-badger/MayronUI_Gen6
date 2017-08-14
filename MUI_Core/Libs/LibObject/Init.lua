@@ -1,4 +1,19 @@
 local _, namespace = ...;
+print("loaded...")
+_G["SLASH_RELOADUI1"] = "/rl";
+SlashCmdList.RELOADUI = ReloadUI;
+
+_G["SLASH_FRAMESTK1"] = "/fs";
+SlashCmdList.FRAMESTK = function()
+    tk.LoadAddOn('Blizzard_DebugTools');
+    FrameStackTooltip_Toggle();
+end
+
+for i = 1, NUM_CHAT_WINDOWS do
+    _G["ChatFrame"..i.."EditBox"]:SetAltArrowKeyMode(false);
+end
+--------------------------------------------
+--------------------------------------------
 
 local LibObject = LibStub:NewLibrary("LibObject", 1.0);
 if (not LibObject) then return; end
@@ -16,45 +31,70 @@ local DefineReturns = {};
 -- local AbstractClasses = {};
 -- local Interfacees = {};
 
+local ProxyFunctionStack = {};
+ProxyFunctionStack.items = {};
+
+function ProxyFunctionStack:Push(item)
+    self.items[#self.items + 1] = item;
+end
+
+function ProxyFunctionStack:Pop()
+    local item;
+
+    if (self:IsEmpty()) then
+        -- create new
+        item = {};
+        item.ReturnValues = {};
+
+        setmetatable(item, {
+            __call = function(self, ...)
+                Private:ValidateArgs(item.ClassController, item.Key);
+
+                Private:FillTable(item.ReturnValues, Private:ValidateReturns(
+                        item.ClassController, 
+                        item.Object[item.Key](item.Instance, item.Private, ...)));         
+
+                ProxyFunctionStack:Push(item);
+                return unpack(item.ReturnValues);
+            end
+        });         
+    else    
+        item = self.items[#self.items];
+        self.items[#self.items] = nil;
+    end
+    return item;
+end
+
+-- might not need
+function ProxyFunctionStack:IsEmpty()
+    return (#self.items == 0);
+end
+
 function LibObject:CreateClass(className, inherits, implements)
 
-    -- create class
-    -- on __newindex, use AttachDefines(class, method) if function
     --// todo: classes should always extend Object
 
     local Class = {};
     local ClassController = {}; -- behind the scenes controller
-    local InstanceMT = {}; -- metatable for instances of class 
+    local ProxyClass = {}; -- redirect all Class keys to this
     local ClassMT = {};
+    local InstanceMT = {}; -- metatable for instances of class 
 
     Class.Static = {}; -- for static functions and properties
 
     ClassController.Locked = false; -- true if functions and properties are to be protected
     ClassController.ClassName = className;
-    ClassController.ProxyData = {}; -- redirect all Class keys to this
+
     ClassController.PrivateInstanceData = {}; -- for Class Private Instance functions and properties
     ClassController.Parents = Private:ParseParents(inherits);
     ClassController.Interfaces = Private:ParseInterfaces(implements);
-
-    ClassController.Key = nil; -- function key being called from Class instance
-    ClassController.Data = nil; -- Selected Private Instance data
-    ClassController.ProxyFunction = function(instance, ...)
-        return Class[ClassController.Key](self, ClassController.Data, ...);
-    end 
+    ClassController.Definitions = {};
 
     -- get a value
     InstanceMT.__index = function(instance, key)
-        if (Class[key] and typeof(Class[key]) == "function") then
-            ClassController.Key = key;
-            ClassController.Data = {};
-            return ClassController.ProxyFunction; -- return proxy function
+        local value = Class[key];
 
-        elseif (Class[key]) then
-            return Class[key]; -- standard inheritance
-
-        else
-            local value = nil;
-
+        if (not value) then
             for _, parent in ipairs(ClassController.Parents) do
                 value = parent[key];
 
@@ -63,21 +103,31 @@ function LibObject:CreateClass(className, inherits, implements)
                 end
             end
 
-            return value;
+        elseif (typeof(value) == "function") then
+            -- controlled function call
+            value = ProxyFunctionStack:Pop();
+
+            value.Object = Class;
+            value.Key = key; -- indicates which function to call through ProxyFunction
+            value.Instance = instance; -- 1st argument of ProxyFunction call
+            value.Private = ClassController.PrivateInstanceData[tostring(instance)]; -- 2nd argument of ProxyFunction call (Private Instance data)       
+            value.ClassController = ClassController;
         end
+
+        return value;
     end
 
     -- create a value
     InstanceMT.__newindex = function(instance, key, value)
         if (Class[key] and ClassController.Locked) then
-            error(ClassController.ClassName .. "." .. key .. " is protected.");
-        elseif (key ~= "_Static") then
-            if (typeof(value) == "function" and (#DefineParams > 0 or #DefineReturns > 0)) then                
+            error(string.format("LibObject: %s.%s is protected.", ClassController.ClassName, key));
+
+        else
+            if (typeof(value) == "function") then                
                 Private:AttachDefines(ClassController, key);
             end
             rawset(instance, key, value);
-        else
-            error("LibObject: _Static property is protected.")
+
         end
     end
 
@@ -94,6 +144,44 @@ function LibObject:CreateClass(className, inherits, implements)
         end
 
         return instance;
+    end
+
+    ClassMT.__index = function(class, key)
+        local value = ProxyClass[key];
+
+        if (typeof(value) == "function") then                
+
+
+            ClassController.Key = key;
+            ClassController.Private = ClassController.PrivateInstanceData[tostring(instance)];
+            ClassController.Self = instance;
+            value = ClassController.ProxyFunction; -- return proxy function
+
+
+        else
+            Class.Static[key] = value;
+        end 
+
+
+    end
+
+    -- set new value (always true)
+    ClassMT.__newindex = function(class, key, value)
+        if (Class[key] and ClassController.Locked) then
+            error(string.format("LibObject: %s.%s is protected.", ClassController.ClassName, key));
+
+        elseif (key ~= "Static") then
+            if (typeof(value) == "function") then                
+                Private:AttachDefines(ClassController, key);
+                ProxyClass[key] = value;
+            else
+                Class.Static[key] = value;
+            end            
+
+        else
+            error(string.format("LibObject: %s.Static property is protected.", ClassController.ClassName));
+
+        end
     end
 
     setmetatable(Class, ClassMT);
@@ -204,20 +292,31 @@ function Private:EmptyTable(tbl)
     end
 end
 
-function Private:AttachDefines(classPrivate, funcName)
+function Private:AttachDefines(classController, funcKey)
+    if (#DefineParams > 0 or #DefineReturns > 0) then
 
-    local attached = false;
+        local funcDef = {};
+        funcDef.Params = {};
+        funcDef.Returns = {};
 
-    if (#DefineParams > 0) then
+        for key, value in tk.pairs(DefineParams) do
+            funcDef.Params[key] = value;
+        end
+    
+        for key, value in tk.pairs(DefineReturns) do
+            funcDef.Returns[key] = value;
+        end
 
+        Private:EmptyTable(DefineParams);
+        Private:EmptyTable(DefineReturns);
+
+        if (classController.Definitions[funcKey]) then
+            error(string.format("LibObject: %s.%s Definition already exists.", 
+                                                    classController.ClassName, funcKey));
+        end
+
+        classController.Definitions[funcKey] = funcDef;
     end
-
-    if (#DefineReturns > 0) then
-
-    end
-
-    return attached;
-
 end
 
 function Private:ParseParents(inherits) 
@@ -242,4 +341,60 @@ function Private:ParseInterfaces(implements)
             table.insert(interfaces, LibObject:Import(interface));
         end
     end
+end
+
+
+-- definitions types: string, number, table, function, any
+
+function Private:ValidateArgs(classController, funcKey, ...)
+
+    local definition = classController.Definitions[funcKey];
+
+    if (definition) then
+        local id = 1;
+        local arg = (tk.select(id, ...));
+
+        repeat
+            -- validate arg:
+            if (definition[id]) then
+                if (not arg) then
+                    error(string.format("LibObject: Required argument not supplied for %s.%s", 
+                                                        classController.ClassName, funcKey));
+                elseif (typeof(arg) ~= definition[id]) then
+                    error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
+                                                        classController.ClassName, funcKey));
+                end
+            elseif (definition.Optional[id]) then
+                if (arg and typeof(arg) ~= definition[id]) then
+                    error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
+                                                        classController.ClassName, funcKey));
+                end
+            else
+                error(string.format("LibObject: Incorrect arguments supplied for %s.%s", 
+                                                        classController.ClassName, funcKey));
+            end
+
+            id = id + 1;
+            arg = (tk.select(id, ...));
+
+        until (not definition[id]);
+    end
+
+    return ...;
+end
+
+function Private:ValidateReturns(definition, ...)
+    return ...;
+end
+
+function Private:FillTable(tbl, ...)
+    local id = 1;
+    local arg = (tk.select(id, ...));
+    self:EmptyTable(tbl);
+
+    repeat    
+        tbl[id] = arg;
+        id = id + 1;
+        arg = (tk.select(id, ...));
+    until (not arg);
 end

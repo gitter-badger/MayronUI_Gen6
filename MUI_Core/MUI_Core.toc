@@ -1,0 +1,8 @@
+## Interface: 70200
+## Title: LibObject
+## Version: 0.1
+
+## initializer:
+Libs/LibStub.lua
+Libs/LibObject/Init.lua
+Libs/LibObject/Test.lua
