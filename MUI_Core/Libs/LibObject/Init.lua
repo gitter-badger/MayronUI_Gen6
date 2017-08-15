@@ -1,4 +1,5 @@
 local _, namespace = ...;
+
 print("loaded...")
 _G["SLASH_RELOADUI1"] = "/rl";
 SlashCmdList.RELOADUI = ReloadUI;
@@ -76,7 +77,7 @@ function LibObject:CreateClass(className, inherits, implements)
 
     local Class = {};
     local ClassController = {}; -- behind the scenes controller
-    local ProxyClass = {}; -- redirect all Class keys to this
+    local ProxyClass = {}; -- redirect all Class keys to this   
     local ClassMT = {};
     local InstanceMT = {}; -- metatable for instances of class 
 
@@ -84,7 +85,7 @@ function LibObject:CreateClass(className, inherits, implements)
 
     ClassController.Locked = false; -- true if functions and properties are to be protected
     ClassController.ClassName = className;
-
+    ClassController.ProxyInstances = {}; -- redirect all instance keys to this  
     ClassController.PrivateInstanceData = {}; -- for Class Private Instance functions and properties
     ClassController.Parents = Private:ParseParents(inherits);
     ClassController.Interfaces = Private:ParseInterfaces(implements);
@@ -92,7 +93,8 @@ function LibObject:CreateClass(className, inherits, implements)
 
     -- get a value
     InstanceMT.__index = function(instance, key)
-        local value = Class[key];
+        local ProxyInstance = ClassController.PrivateInstanceData[tostring(instance)];
+        local value = ProxyInstance[key] or Class[key];
 
         if (not value) then
             for _, parent in ipairs(ClassController.Parents) do
@@ -119,6 +121,8 @@ function LibObject:CreateClass(className, inherits, implements)
 
     -- create a value
     InstanceMT.__newindex = function(instance, key, value)
+    local ProxyInstance = ClassController.PrivateInstanceData[tostring(instance)];
+
         if (Class[key] and ClassController.Locked) then
             error(string.format("LibObject: %s.%s is protected.", ClassController.ClassName, key));
 
@@ -126,8 +130,7 @@ function LibObject:CreateClass(className, inherits, implements)
             if (typeof(value) == "function") then                
                 Private:AttachDefines(ClassController, key);
             end
-            rawset(instance, key, value);
-
+            ProxyInstance[key] = value;
         end
     end
 
@@ -136,7 +139,8 @@ function LibObject:CreateClass(className, inherits, implements)
         local instance = {};
         local private = {};
 
-        ClassController.PrivateInstanceData[tostring(instance)] = private;     
+        ClassController.PrivateInstanceData[tostring(instance)] = private;    
+        ClassController.ProxyInstances[tostring(instance)] = {}; 
         setmetatable(instance, InstanceMT);
 
         if instance._Constructor then
@@ -147,22 +151,19 @@ function LibObject:CreateClass(className, inherits, implements)
     end
 
     ClassMT.__index = function(class, key)
-        local value = ProxyClass[key];
+        local value = ProxyClass[key] or Class.Static[key];
 
-        if (typeof(value) == "function") then                
+        if (typeof(value) == "function") then
+            value = ProxyFunctionStack:Pop();
 
+            value.Object = Class;
+            value.Key = key; -- indicates which function to call through ProxyFunction
+            value.Instance = class; -- 1st argument of ProxyFunction call
+            value.Private = ClassController.PrivateInstanceData[tostring(instance)]; -- 2nd argument of ProxyFunction call (Private Instance data)       
+            value.ClassController = ClassController;
+        end
 
-            ClassController.Key = key;
-            ClassController.Private = ClassController.PrivateInstanceData[tostring(instance)];
-            ClassController.Self = instance;
-            value = ClassController.ProxyFunction; -- return proxy function
-
-
-        else
-            Class.Static[key] = value;
-        end 
-
-
+        return value;
     end
 
     -- set new value (always true)
@@ -217,12 +218,17 @@ function LibObject:Export(namespace, class)
     local root = Private.Directory;
     local lastKey = nil;
 
-    for id, key in ipairs(nodes) do
-        root = root[key];
-
-        if (root == nil and id < (#nodes - 1)) then
-            error("LibObject.Export: Namespace invalid.");
+    for id, key in ipairs(nodes) do 
+        if (id < #nodes) then
+            root[key] = root[key] or {};
+            root = root[key];
         end
+
+        lastKey = key;
+    end
+
+    if (not lastKey or lastKey:match("%s+")) then
+        error("LibObject.Export: Namespace invalid.");
     end
 
     if (root[lastKey]) then
