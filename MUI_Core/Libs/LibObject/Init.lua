@@ -20,7 +20,7 @@ local LibObject = LibStub:NewLibrary("LibObject", 1.0);
 if (not LibObject) then return; end
 
 local error, rawget, rawset, setmetatable = error, rawget, rawset, setmetatable;
-local typeof = typeof;
+local type = type;
 
 local Private = {};
 Private.Directory = {};
@@ -87,9 +87,15 @@ function LibObject:CreateClass(className, inherits, implements)
     ClassController.ClassName = className;
     ClassController.ProxyInstances = {}; -- redirect all instance keys to this  
     ClassController.PrivateInstanceData = {}; -- for Class Private Instance functions and properties
-    ClassController.Parents = Private:ParseParents(inherits);
-    ClassController.Interfaces = Private:ParseInterfaces(implements);
     ClassController.Definitions = {};
+
+    if (not Private:IsStringNilOrWhiteSpace(inherits)) then
+        ClassController.Parents = Private:ParseParents(inherits);
+    end
+
+    if (not Private:IsStringNilOrWhiteSpace(implements)) then
+        ClassController.Interfaces = Private:ParseParents(implements);
+    end   
 
     -- get a value
     InstanceMT.__index = function(instance, key)
@@ -105,7 +111,7 @@ function LibObject:CreateClass(className, inherits, implements)
                 end
             end
 
-        elseif (typeof(value) == "function") then
+        elseif (type(value) == "function") then
             -- controlled function call
             value = ProxyFunctionStack:Pop();
 
@@ -127,7 +133,7 @@ function LibObject:CreateClass(className, inherits, implements)
             error(string.format("LibObject: %s.%s is protected.", ClassController.ClassName, key));
 
         else
-            if (typeof(value) == "function") then                
+            if (type(value) == "function") then                
                 Private:AttachDefines(ClassController, key);
             end
             ProxyInstance[key] = value;
@@ -153,7 +159,7 @@ function LibObject:CreateClass(className, inherits, implements)
     ClassMT.__index = function(class, key)
         local value = ProxyClass[key] or Class.Static[key];
 
-        if (typeof(value) == "function") then
+        if (type(value) == "function") then
             value = ProxyFunctionStack:Pop();
 
             value.Object = Class;
@@ -172,7 +178,7 @@ function LibObject:CreateClass(className, inherits, implements)
             error(string.format("LibObject: %s.%s is protected.", ClassController.ClassName, key));
 
         elseif (key ~= "Static") then
-            if (typeof(value) == "function") then                
+            if (type(value) == "function") then                
                 Private:AttachDefines(ClassController, key);
                 ProxyClass[key] = value;
             else
@@ -218,17 +224,18 @@ function LibObject:Export(namespace, class)
     local root = Private.Directory;
     local lastKey = nil;
 
-    for id, key in ipairs(nodes) do 
+    for id, key in ipairs(nodes) do
+        if (Private:IsStringNilOrWhiteSpace(key)) then
+            error("LibObject.Export: Namespace invalid.");
+        end
+        key = key:gsub("%s+", "");
+
         if (id < #nodes) then
             root[key] = root[key] or {};
             root = root[key];
         end
 
         lastKey = key;
-    end
-
-    if (not lastKey or lastKey:match("%s+")) then
-        error("LibObject.Export: Namespace invalid.");
     end
 
     if (root[lastKey]) then
@@ -247,9 +254,9 @@ function LibObject:DefineParams(...)
     local optionalFound = false;
     Private:EmptyTable(DefineParams);
 
-    for id, paramType in ipairs({...}) do    
-        paramType = paramType:gsub("%s+", "");
-        if (#paramType > 0) then
+    for id, paramType in ipairs({...}) do  
+        if (not Private:IsStringNilOrWhiteSpace(paramType)) then    
+            paramType = paramType:gsub("%s+", "");
 
             if (paramType.starts("?")) then
                 DefineParams.Optional = DefineParams.Optional or {};
@@ -261,7 +268,6 @@ function LibObject:DefineParams(...)
             else
                 DefineParams[id] = paramType;
             end
-
         end
     end    
 end
@@ -270,9 +276,9 @@ function LibObject:DefineReturns(...)
     local optionalFound = false;
     Private:EmptyTable(DefineReturns);
 
-    for id, rtnType in ipairs({...}) do    
-        rtnType = rtnType:gsub("%s+", "");
-        if (#rtnType > 0) then
+    for id, rtnType in ipairs({...}) do 
+        if (not Private:IsStringNilOrWhiteSpace(rtnType)) then   
+            rtnType = rtnType:gsub("%s+", "");
 
             if (rtnType.starts("?")) then
                 DefineReturns.Optional = DefineReturns.Optional or {};
@@ -284,7 +290,6 @@ function LibObject:DefineReturns(...)
             else
                 DefineReturns[id] = rtnType;
             end
-
         end
     end  
 end
@@ -340,12 +345,16 @@ end
 function Private:ParseInterfaces(implements) 
     local interfaces = {};
 
-    for id, interface in ipairs({strsplit(",", implements)}) do    
-        interface = interface:gsub("%s+", "");
+    for id, interface in ipairs({strsplit(",", implements)}) do 
+        
+        if (not Private:IsStringNilOrWhiteSpace(interface)) then
+            interface = interface:gsub("%s+", "");
 
-        if (#interface > 0) then
-            table.insert(interfaces, LibObject:Import(interface));
+            if (#interface > 0) then
+                table.insert(interfaces, LibObject:Import(interface));
+            end
         end
+
     end
 end
 
@@ -366,12 +375,12 @@ function Private:ValidateArgs(classController, funcKey, ...)
                 if (not arg) then
                     error(string.format("LibObject: Required argument not supplied for %s.%s", 
                                                         classController.ClassName, funcKey));
-                elseif (typeof(arg) ~= definition[id]) then
+                elseif (type(arg) ~= definition[id]) then
                     error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
                                                         classController.ClassName, funcKey));
                 end
             elseif (definition.Optional[id]) then
-                if (arg and typeof(arg) ~= definition[id]) then
+                if (arg and type(arg) ~= definition[id]) then
                     error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
                                                         classController.ClassName, funcKey));
                 end
@@ -403,4 +412,18 @@ function Private:FillTable(tbl, ...)
         id = id + 1;
         arg = (tk.select(id, ...));
     until (not arg);
+end
+
+function Private:IsStringNilOrWhiteSpace(string)
+    local value = true;
+
+    if (string) then
+        string = string:gsub("%s+", "");
+
+        if (#string > 0) then
+            value = false;
+        end
+    end
+
+    return value;
 end
