@@ -4,5 +4,7 @@
 
 ## initializer:
 Libs/LibStub.lua
+
 Libs/LibObject/Init.lua
+Libs/LibObject/Framework/Embeds.xml
 Libs/LibObject/Test.lua
