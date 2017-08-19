@@ -250,7 +250,9 @@ end
 -- ProxyFunction
 -------------------------------------
 ProxyFunction.Run = function(self, ...)
-    Private:ValidateParams(ProxyFunction.Controller, ProxyFunction.Key, ...);
+    local definition, message = Private:GetParamsDefinition();
+
+    Private:ValidateFunction(definition, message, ...);
 
     if (not ProxyFunction.Private) then     
         error(string.format("LibObject: %s.%s is a non static " .. 
@@ -258,7 +260,8 @@ ProxyFunction.Run = function(self, ...)
                 ProxyFunction.Controller.EntityName, ProxyFunction.Key));
     end
 
-    return Private:ValidateReturns(ProxyFunction.Controller, 
+    definition, message = Private:GetReturnsDefinition();
+    return Private:ValidateFunction(definition, message,
                 ProxyFunction.Object[ProxyFunction.Key](ProxyFunction.Instance, ProxyFunction.Private, ...));
 end
 
@@ -364,51 +367,6 @@ function Private:GetNameSpaceList(package, modifier, subset)
 	return list;
 end
 
--- definitions types: string, number, table, function, any
-function Private:ValidateParams(Controller, funcKey, ...)
-    local definition = Controller.Definitions[funcKey];
-
-    if (definition and definition.Params) then
-        definition =  definition.Params;
-
-        local id = 1;
-        local arg = (select(id, ...));
-
-        repeat      
-            -- validate arg:
-            if (definition[id]) then
-                if (not arg) then
-                    error(string.format("LibObject: Required argument not supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-                elseif (type(arg) ~= definition[id]) then
-                    error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-                end
-            elseif (definition.Optional and definition.Optional[id]) then               
-
-                if (arg and type(arg) ~= definition.Optional[id]) then
-                    error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-                end
-            else
-                error(string.format("LibObject: Incorrect arguments supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-            end
-
-            id = id + 1;
-            arg = (select(id, ...));
-
-        until (not (definition[id] or definition.Optional and definition.Optional[id]));
-    end
-
-    return ...;
-end
-
---\\ TODO:
-function Private:ValidateReturns(definition, ...)
-    return ...;
-end
-
 function Private:FillTable(tbl, ...)
     local id = 1;
     local arg = (select(id, ...));
@@ -489,4 +447,57 @@ function Private:DefineFunction(defTable, ...)
             end
         end
     end
+end
+
+function Private:ValidateFunction(definition, message, ...)
+    local errorFound;
+
+    if (definition) then
+
+        local id = 1;
+        local arg = (select(id, ...));
+
+        repeat      
+            -- validate arg:
+            if (definition[id]) then
+                errorFound = (not arg) or type(arg) ~= definition[id];
+
+            elseif (definition.Optional and definition.Optional[id]) then
+                errorFound = arg and type(arg) ~= definition.Optional[id];
+
+            else
+                errorFound = true;                 
+            end
+
+            if (errorFound) then
+                error(message);
+            end
+
+            id = id + 1;
+            arg = (select(id, ...));
+
+        until (not (definition[id] or definition.Optional and definition.Optional[id]));
+    end
+
+    return ...;
+end
+
+function Private:GetParamsDefinition()
+    local message = string.format("LibObject: Incorrect argument type[s] found for %s.%s", 
+        ProxyFunction.Controller.EntityName, ProxyFunction.Key);
+
+    local definition = ProxyFunction.Controller.Definitions[ProxyFunction.Key];
+    definition = definition and definition.Params; 
+
+    return definition, message;
+end
+
+function Private:GetReturnsDefinition()
+    local message = string.format("LibObject: Incorrect return type[s] found for %s.%s", 
+        ProxyFunction.Controller.EntityName, ProxyFunction.Key);
+
+    local definition = ProxyFunction.Controller.Definitions[ProxyFunction.Key];
+    definition = definition and definition.Returns; 
+
+    return definition, message;
 end

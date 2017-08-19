@@ -119,11 +119,11 @@ function DefineReturns_Test1()
 
     local p = Player();
 
-    -- print(p:Func1()); -- should work!
+    print(p:Func1()); -- should work!
 
-    --print(p:Func2()); -- should work!
+    print(p:Func2()); -- should work!
 
-    print(p:Func3()); -- should fail!
+    --print(p:Func3()); -- should fail!
 
     --print(p:Func4()); -- should fail!
 end
@@ -143,7 +143,7 @@ end
 ---------------------------------
 -- Run Tests:
 ---------------------------------
---HelloWorld_Test1();
---Inheritance_Test1();
---DefineParams_Test1();
-DefineReturns_Test1();
+-- HelloWorld_Test1();
+-- Inheritance_Test1();
+-- DefineParams_Test1();
+-- DefineReturns_Test1();
