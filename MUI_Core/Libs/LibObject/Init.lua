@@ -437,6 +437,7 @@ function Private:ValidateArgs(Controller, funcKey, ...)
 
     return ...;
 end
+local new;
 
 --\\ TODO:
 function Private:ValidateReturns(definition, ...)
