@@ -71,13 +71,79 @@ local function Inheritance_Test1()
     print("Inheritance_Test1 Successful!");
 end
 
--- TODO:
--- Test DefineArgs + DefineReturns
--- Test Exporting a namespace (as a list)
--- Test Interfaces
+function DefineParams_Test1()
+
+    local Player = lib:CreateClass("Player");
+
+    lib:DefineParams("string", "?number");
+    function Player:GetSpellCasting(private, spellName, spellType)
+        spellType = spellType or 0;
+
+        print(spellName);
+    end
+
+    local p = Player();
+
+    p:GetSpellCasting("Bloodlust"); -- should work!
+
+    -- p:GetSpellCasting(123); -- should fail as not a string!
+
+    -- p:GetSpellCasting("Flame Shock", 123); -- should work!
+
+    -- p:GetSpellCasting("Flame Shock", "123"); -- should fail as not a number!
+
+end
+
+function DefineReturns_Test1()
+    local Player = lib:CreateClass("Player");
+
+    lib:DefineReturns("string", "?number");
+    function Player:Func1(private)        
+        return "Success!";
+    end
+
+    lib:DefineReturns("string", "?number");
+    function Player:Func2(private)        
+        return "Success!", 123;
+    end
+
+    lib:DefineReturns("string", "?number");
+    function Player:Func3(private)        
+        return 123;
+    end
+
+    lib:DefineReturns("string", "?number");
+    function Player:Func4(private)        
+        return "Fail", "123";
+    end
+
+    local p = Player();
+
+    print(p:Func1()); -- should work!
+
+    print(p:Func2()); -- should work!
+
+    --print(p:Func3()); -- should fail!
+
+    --print(p:Func4()); -- should fail!
+end
+
+function ExportNamespace_Test1()
+
+end
+
+function ImplementInterface_Test1()
+
+end
+
+function DuplicateClass_Test1()
+
+end
 
 ---------------------------------
 -- Run Tests:
 ---------------------------------
-HelloWorld_Test1();
-Inheritance_Test1();
+-- HelloWorld_Test1();
+-- Inheritance_Test1();
+-- DefineParams_Test1();
+-- DefineReturns_Test1();

@@ -231,47 +231,11 @@ function LibObject:LockClass(class)
 end
 
 function LibObject:DefineParams(...)
-    local optionalFound = false;
-    Private:EmptyTable(DefineParams);
-
-    for id, paramType in ipairs({...}) do  
-        if (not Private:IsStringNilOrWhiteSpace(paramType)) then    
-            paramType = paramType:gsub("%s+", "");
-
-            if (paramType.starts("?")) then
-                DefineParams.Optional = DefineParams.Optional or {};
-                paramType = paramType.replace("?", "");
-                DefineParams.Optional[id] = paramType;
-
-            elseif (DefineParams.Optional) then
-                error("LibObject.DefineParams: Optional parameters must appear at the end of the method declaration.");
-            else
-                DefineParams[id] = paramType;
-            end
-        end
-    end    
+    Private:DefineFunction(DefineParams, ...);    
 end
 
 function LibObject:DefineReturns(...)
-    local optionalFound = false;
-    Private:EmptyTable(DefineReturns);
-
-    for id, rtnType in ipairs({...}) do 
-        if (not Private:IsStringNilOrWhiteSpace(rtnType)) then   
-            rtnType = rtnType:gsub("%s+", "");
-
-            if (rtnType.starts("?")) then
-                DefineReturns.Optional = DefineReturns.Optional or {};
-                rtnType = rtnType.replace("?", "");
-                DefineReturns.Optional[id] = rtnType;
-
-            elseif (DefineReturns.Optional) then
-                error("LibObject.DefineReturns: Optional return values must appear at the end of the return list declaration.");
-            else
-                DefineReturns[id] = rtnType;
-            end
-        end
-    end  
+    Private:DefineFunction(DefineReturns, ...); 
 end
 
 function LibObject:Implements(funcName)
@@ -286,7 +250,9 @@ end
 -- ProxyFunction
 -------------------------------------
 ProxyFunction.Run = function(self, ...)
-    Private:ValidateArgs(ProxyFunction.Controller, ProxyFunction.Key, ...);
+    local definition, message = Private:GetParamsDefinition();
+
+    Private:ValidateFunction(definition, message, ...);
 
     if (not ProxyFunction.Private) then     
         error(string.format("LibObject: %s.%s is a non static " .. 
@@ -294,7 +260,8 @@ ProxyFunction.Run = function(self, ...)
                 ProxyFunction.Controller.EntityName, ProxyFunction.Key));
     end
 
-    return Private:ValidateReturns(ProxyFunction.Controller, 
+    definition, message = Private:GetReturnsDefinition();
+    return Private:ValidateFunction(definition, message,
                 ProxyFunction.Object[ProxyFunction.Key](ProxyFunction.Instance, ProxyFunction.Private, ...));
 end
 
@@ -335,14 +302,14 @@ function Private:AttachDefines(Controller, funcKey)
     if (#DefineParams > 0 or #DefineReturns > 0) then
 
         local funcDef = {};
-        funcDef.Params = {};
-        funcDef.Returns = {};
 
         for key, value in pairs(DefineParams) do
+            funcDef.Params = funcDef.Params or {};
             funcDef.Params[key] = value;
         end
     
         for key, value in pairs(DefineReturns) do
+            funcDef.Returns = funcDef.Returns or {};
             funcDef.Returns[key] = value;
         end
 
@@ -400,6 +367,7 @@ function Private:GetNameSpaceList(package, modifier, subset)
 	return list;
 end
 
+<<<<<<< HEAD
 -- definitions types: string, number, table, function, any
 function Private:ValidateArgs(Controller, funcKey, ...)
 
@@ -444,6 +412,8 @@ function Private:ValidateReturns(definition, ...)
     return ...;
 end
 
+=======
+>>>>>>> 8f1d38046f7e3744c8ad8b4cdebb3563fcc1152d
 function Private:FillTable(tbl, ...)
     local id = 1;
     local arg = (select(id, ...));
@@ -502,4 +472,79 @@ function Private:GetController(entity)
 	assert(controller, "(LibObject) Private.GetController: Invalid entity argument.");
 
     return controller;
+end
+
+function Private:DefineFunction(defTable, ...)
+    local optionalFound = false;
+    Private:EmptyTable(defTable);
+
+    for id, valueType in ipairs({...}) do  
+        if (not Private:IsStringNilOrWhiteSpace(valueType)) then    
+            valueType = valueType:gsub("%s+", ""); 
+
+            if (valueType:match("^%?")) then
+                defTable.Optional = defTable.Optional or {};
+                valueType = valueType:gsub("?", "");
+                defTable.Optional[id] = valueType;
+
+            elseif (defTable.Optional) then
+                error("(LibObject) Private.DefineFunction: Optional values must appear at the end of the definition list.");
+            else
+                defTable[id] = valueType;
+            end
+        end
+    end
+end
+
+function Private:ValidateFunction(definition, message, ...)
+    local errorFound;
+
+    if (definition) then
+
+        local id = 1;
+        local arg = (select(id, ...));
+
+        repeat      
+            -- validate arg:
+            if (definition[id]) then
+                errorFound = (not arg) or type(arg) ~= definition[id];
+
+            elseif (definition.Optional and definition.Optional[id]) then
+                errorFound = arg and type(arg) ~= definition.Optional[id];
+
+            else
+                errorFound = true;                 
+            end
+
+            if (errorFound) then
+                error(message);
+            end
+
+            id = id + 1;
+            arg = (select(id, ...));
+
+        until (not (definition[id] or definition.Optional and definition.Optional[id]));
+    end
+
+    return ...;
+end
+
+function Private:GetParamsDefinition()
+    local message = string.format("LibObject: Incorrect argument type[s] found for %s.%s", 
+        ProxyFunction.Controller.EntityName, ProxyFunction.Key);
+
+    local definition = ProxyFunction.Controller.Definitions[ProxyFunction.Key];
+    definition = definition and definition.Params; 
+
+    return definition, message;
+end
+
+function Private:GetReturnsDefinition()
+    local message = string.format("LibObject: Incorrect return type[s] found for %s.%s", 
+        ProxyFunction.Controller.EntityName, ProxyFunction.Key);
+
+    local definition = ProxyFunction.Controller.Definitions[ProxyFunction.Key];
+    definition = definition and definition.Returns; 
+
+    return definition, message;
 end
