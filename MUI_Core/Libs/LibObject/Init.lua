@@ -367,53 +367,6 @@ function Private:GetNameSpaceList(package, modifier, subset)
 	return list;
 end
 
-<<<<<<< HEAD
--- definitions types: string, number, table, function, any
-function Private:ValidateArgs(Controller, funcKey, ...)
-
-    local definition = Controller.Definitions[funcKey];
-
-    if (definition) then
-        local id = 1;
-        local arg = (select(id, ...));
-
-        repeat
-            -- validate arg:
-            if (definition[id]) then
-                if (not arg) then
-                    error(string.format("LibObject: Required argument not supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-                elseif (type(arg) ~= definition[id]) then
-                    error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-                end
-            elseif (definition.Optional[id]) then
-                if (arg and type(arg) ~= definition[id]) then
-                    error(string.format("LibObject: Incorrect argument type supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-                end
-            else
-                error(string.format("LibObject: Incorrect arguments supplied for %s.%s", 
-                                                        Controller.EntityName, funcKey));
-            end
-
-            id = id + 1;
-            arg = (select(id, ...));
-
-        until (not definition[id]);
-    end
-
-    return ...;
-end
-local new;
-
---\\ TODO:
-function Private:ValidateReturns(definition, ...)
-    return ...;
-end
-
-=======
->>>>>>> 8f1d38046f7e3744c8ad8b4cdebb3563fcc1152d
 function Private:FillTable(tbl, ...)
     local id = 1;
     local arg = (select(id, ...));
