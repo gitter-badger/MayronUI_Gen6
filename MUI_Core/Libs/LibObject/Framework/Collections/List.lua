@@ -1,64 +1,142 @@
--- local _, core = ...;
--- local Collections = core.Framework.Collections;
+local _, core = ...;
+local LibObject = core.Lib;
+if (not LibObject) then return; end
 
--- local List = core.Lib:CreateClass("List");
--- Collections.List = List;
+local List = LibObject:CreateClass("List");
+LibObject:Export("Framework.Collections", List);
 
--- core.Lib:Export("Framework.Collections.List");
+function List:__Constructor(private, ...)
+    private.values = {};
+    self:AddAll(...);
+end
 
--- function List:Add(private, item)
+function List:Add(private, value, index)
+    if (index) then
+        table.insert(private.values, index, value);
+    else
+        table.insert(private.values, value);
+    end
+end
 
--- end
+function List:Remove(private, index)
+    table.remove(private.values, index);
+end
 
--- function List:Remove(private)
+function List:RemoveByValue(private, value, allValues)
+    local index = 1;
+    local value2 = private.values[index];
 
--- end
+    while (value2) do
+        if (value2 == value) then
+            self:Remove(index);
+            if (not allValues) then
+                break;
+            end
+        else
+            index = index + 1;
+        end
 
--- function List:ForEach(private)
+        value2 = private.values[index];
+    end
+end
 
--- end
+function List:ForEach(private, func)
+    for index, value in ipairs(private.values) do
+        func(index, value);
+    end
+end
 
--- function List:Iterate(private)
+function List:Filter(private, predicate)
+    local index = 1;
+    local value = private.values[index];
 
--- end
+    while (value) do
+        if (predicate(index, value)) then
+            self:Remove(index);
+        else
+            index = index + 1;
+        end
 
--- function List:Get(private)
+        value = private.values[index];
+    end
+end
 
--- end
+function List:Select(private, predicate)
+    local selected = {};
 
--- function List:Contains(private)
+    for index, value in ipairs(private.values) do
+        if (predicate(index, value)) then
+            selected[#selected] = value;
+        end
+    end
 
--- end
+    return selected;
+end
 
--- function List:Empty(private)
+local function iter(values, index)
+    index = index + 1;
+    if (values[index]) then
+        return index, values[index];
+    end
+end
 
--- end
+function List:Iterate(private)
+    return iter, private.values, 0;
+end
 
--- function List:IsEmpty(private)
+function List:Get(private, index)
+    return private.values[index];
+end
 
--- end
+function List:Contains(private, value)    
+    for index, value2 in ipairs(private.values) do
+        if (value2 == value) then
+            return true;
+        end
+    end
+    return false;
+end
 
--- function List:Size(private)
+function List:Empty(private)
+    for index, _ in ipairs(private.values) do
+        private.values[index] = nil;
+    end
+end
 
--- end
+function List:IsEmpty(private)
+    return #private.values > 0;
+end
 
--- function List:ToTable(private)
+function List:Size(private)
+    return #private.values;
+end
 
--- end
+function List:ToTable(private)
+    local copy = {};
 
--- function List:Where(private, predicate)
+    for index, value in ipairs(private.values) do
+        copy[index] = value;
+    end
 
--- end
+    return copy;
+end
 
--- function List:AddAll(private)
+function List:AddAll(private, ...)
+    for _, value in ipairs({...}) do
+        table.insert(private.values, value);
+    end    
+end
 
--- end
+function List:RemoveAll(private, ...)
+    for _, value in ipairs({...}) do
+        self:RemoveByValue(value);
+    end
+end
 
--- function List:RemoveAll(private)
-
--- end
-
--- function List:RetainAll(private)
-
--- end
-
+function List:RetainAll(private, ...)
+    for _, value in ipairs({...}) do
+        if (not self:Contains(value)) then
+            self:RemoveByValue(value);
+        end
+    end
+end

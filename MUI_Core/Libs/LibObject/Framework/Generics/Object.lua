@@ -4,11 +4,7 @@ local LibObject = core.Lib;
 if (not LibObject) then return; end
 
 local Object = LibObject:CreateClass("Object"); -- this is fine! importing a class adds special validation lock!
-LibObject:Export(Object, "Framework.Generics");
-
-function Object:ToString() 
-	return tostring(self):gsub("table", self:GetObjectType());
-end
+LibObject:Export("Framework.Generics", Object);
 
 function Object:GetObjectType(private)	
 	return core.Private:GetController(self).EntityName;
@@ -75,6 +71,10 @@ end
 
 function Object:Destroy(private)
 	local controller = core.Private:GetController(self);
+
+	if (self.__Destructor) then
+		self:__Destructor();
+	end
 
 	for key, _ in pairs(private) do
 		private[key] = nil;

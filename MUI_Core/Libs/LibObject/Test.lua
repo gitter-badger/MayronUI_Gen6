@@ -72,6 +72,7 @@ local function Inheritance_Test1()
 end
 
 function DefineParams_Test1()
+    print("DefineParams_Test1 Started");
 
     local Player = lib:CreateClass("Player");
 
@@ -92,9 +93,12 @@ function DefineParams_Test1()
 
     -- p:GetSpellCasting("Flame Shock", "123"); -- should fail as not a number!
 
+    print("DefineParams_Test1 Successful!");
 end
 
 function DefineReturns_Test1()
+    print("DefineReturns_Test1 Started");
+
     local Player = lib:CreateClass("Player");
 
     lib:DefineReturns("string", "?number");
@@ -119,25 +123,61 @@ function DefineReturns_Test1()
 
     local p = Player();
 
-    print(p:Func1()); -- should work!
+    -- print(p:Func1()); -- should work!
 
-    print(p:Func2()); -- should work!
+    -- print(p:Func2()); -- should work!
 
-    --print(p:Func3()); -- should fail!
+    -- print(p:Func3()); -- should fail!
 
-    --print(p:Func4()); -- should fail!
+    -- print(p:Func4()); -- should fail!
+
+    print("DefineReturns_Test1 Successful!");
 end
 
 function ExportNamespace_Test1()
+    print("ExportNamespace_Test1 Started");
 
+    local CheckButton = lib:CreateClass("CheckButton");
+    local Button = lib:CreateClass("Button");
+    local Slider = lib:CreateClass("Slider");
+    local TextArea = lib:CreateClass("TextArea");
+    local FontString = lib:CreateClass("FontString");
+    local Animator = lib:CreateClass("Animator");
+
+    lib:Export("Framework.GUI.Widgets", 
+        CheckButton, 
+        Button, 
+        Slider,
+        TextArea,
+        FontString,
+        Animator
+    );
+
+    local CheckButton2 = lib:Import("Framework.GUI.Widgets.CheckButton");
+
+    assert(CheckButton == CheckButton2);
+
+    local packageList = lib:Import("Framework.GUI.Widgets.*");
+
+    print(packageList:Size());
+
+    packageList:ForEach(function(_, value) print(value) end);
+
+    -- for key, value in pairs(package) do
+    --     print(string.format("%s : %s", key, tostring(value)));
+    -- end
+
+    print("ExportNamespace_Test1 Successful!");
 end
 
 function ImplementInterface_Test1()
-
+    print("ImplementInterface_Test1 Started");
+    print("ImplementInterface_Test1 Successful!");
 end
 
 function DuplicateClass_Test1()
-
+    print("DuplicateClass_Test1 Started");
+    print("DuplicateClass_Test1 Successful!");
 end
 
 ---------------------------------
@@ -147,3 +187,4 @@ end
 -- Inheritance_Test1();
 -- DefineParams_Test1();
 -- DefineReturns_Test1();
+ExportNamespace_Test1();

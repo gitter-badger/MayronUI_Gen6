@@ -43,10 +43,11 @@ function LibObject:CreateClass(className, parent, implements)
     local ProxyClass = {}; -- redirect all Class keys to this   
     local ClassMT = {};
     local InstanceMT = {}; -- metatable for instances of class 
+    local RawClassString = tostring(Class);
 
     ProxyClass.Static = {}; -- for static functions and properties
 
-    Controller.Locked = false; -- true if functions and properties are to be protected
+    Controller.Protected = false; -- true if functions and properties are to be protected
     Controller.EntityName = className;
     Controller.ProxyInstances = {}; -- redirect all instance keys to this  
     Controller.PrivateInstanceData = {}; -- for Class Private Instance functions and properties
@@ -55,7 +56,7 @@ function LibObject:CreateClass(className, parent, implements)
     Controller.Class = Class;
 	
     Private:SetClassParent(Controller, parent);
-	Private:SetClassInterfaces(Controller, implements);
+	Private:SetClassInterfaces(Controller, implements);    
 
     InstanceMT.Class = Class;
     ClassMT.Class = Class;
@@ -64,6 +65,7 @@ function LibObject:CreateClass(className, parent, implements)
     InstanceMT.__index = function(instance, key)
         local ProxyInstance = Controller.ProxyInstances[tostring(instance)];
         local PrivateData = Controller.PrivateInstanceData[tostring(instance)];
+
         local value = ProxyInstance[key];
 
         if (type(value) == "function") then
@@ -85,7 +87,7 @@ function LibObject:CreateClass(className, parent, implements)
     InstanceMT.__newindex = function(instance, key, value)
         local ProxyInstance = Controller.PrivateInstanceData[tostring(instance)];
 
-        if (Class[key] and Controller.Locked) then
+        if (Class[key] and Controller.Protected) then
             error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
         else
             if (type(value) == "function") then                
@@ -99,14 +101,21 @@ function LibObject:CreateClass(className, parent, implements)
         self:Destroy();
     end
 
+    InstanceMT.__tostring = function(self)
+        setmetatable(self, nil);
+        local value = tostring(self);
+        setmetatable(self, InstanceMT);
+        return value:gsub("table", string.format("<Instance> %s", className));
+    end
+
     -- create instance of class (static only)
     ClassMT.__call = function(_, ...)    
         local instance = {};
         local instanceData = {};
 
+        setmetatable(instance, InstanceMT);
         Controller.PrivateInstanceData[tostring(instance)] = instanceData;    
         Controller.ProxyInstances[tostring(instance)] = {}; 
-        setmetatable(instance, InstanceMT);
 
         if (Controller.CloneFrom) then
             local other = Controller.CloneFrom;
@@ -122,8 +131,8 @@ function LibObject:CreateClass(className, parent, implements)
 
             Controller.CloneFrom = nil;
 
-        elseif (ProxyClass._Constructor) then
-            instance:_Constructor(...);
+        elseif (ProxyClass.__Constructor) then
+            instance:__Constructor(...);
         end
 
         return instance;
@@ -149,7 +158,7 @@ function LibObject:CreateClass(className, parent, implements)
     -- set new value (always true)
     ClassMT.__newindex = function(class, key, value)
         if (key ~= "Static") then
-            if (ProxyClass[key] and Controller.Locked) then
+            if (ProxyClass[key] and Controller.Protected) then
                 error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
             end
 
@@ -162,6 +171,10 @@ function LibObject:CreateClass(className, parent, implements)
         else
             error(string.format("LibObject: %s.Static property is protected.", Controller.EntityName));
         end
+    end
+
+    ClassMT.__tostring = function()
+        return RawClassString:gsub("table", string.format("<Class> %s", className));
     end
     
     setmetatable(Class, ClassMT);
@@ -185,49 +198,51 @@ end
 
 function LibObject:Import(namespace, subset)
     local package = core.RootPackage;
-	local command;
 
     for id, key in ipairs({strsplit(".", namespace)}) do    
-        assert(not Private:IsStringNilOrWhiteSpace(key), "LibObject.Import: Invalid namespace argument.");   
-		package = package[key];
-        assert(package, string.format("LibObject.Import: Invalid namespace \"%s\".", namespace));
-		
+        assert(not Private:IsStringNilOrWhiteSpace(key), "LibObject.Import: Invalid namespace.");
+
 		if (key == "*" or key == "+" or key == "-") then
-			command = key;			
 			package = Private:GetNameSpaceList(package, key, subset);	
-			break;
-		end
+            break;
+		else
+            package = package[key];
+            assert(package, string.format("LibObject.Import: Invalid namespace \"%s\".", namespace));
+        end
     end
+
+    assert(Controllers[tostring(package)] or package.IsObjectType and package:IsObjectType("List"), "LibObject.Import: Invalid namespace.");
 
     return package;
 end
 
-function LibObject:Export(entity, namespace)
+function LibObject:Export(namespace, ...)
     local package = core.RootPackage;
-    local controller = Controllers[tostring(entity)];
-
-    assert(controller, "LibObject.Export: Invalid entity argument.");
+    local controller;
 
     if (not Private:IsStringNilOrWhiteSpace(namespace)) then
         for id, key in ipairs({strsplit(".", namespace)}) do        
             assert(not Private:IsStringNilOrWhiteSpace(key), "LibObject.Import: Invalid namespace argument.");
-
             key = key:gsub("%s+", "");
             package[key] = package[key] or {};
             package = package[key];
         end
     end
 
-    assert(not package[controller.EntityName], "LibObject.Export: Path already in use.");
-    package[controller.EntityName] = entity;
+    for id, entity in ipairs({...}) do
+        controller = Controllers[tostring(entity)];
+        assert(controller, string.format("LibObject.Export: Invalid entities[%s] argument.", id));
+        assert(not package[controller.EntityName], string.format("LibObject.Export: Entities[%s] path already in use.", id));        
+        package[controller.EntityName] = entity;
+    end
 end
 
 -- prevents other functions being added or modified
-function LibObject:LockClass(class)
+function LibObject:ProtectClass(class)
 	local controller = Controllers[tostring(class)];
 
-    assert(controller and controller.IsClass, "LibObject.LockClass: Unknown entity supplied.");
-	controller.Locked = true;
+    assert(controller and controller.IsClass, "LibObject.ProtectClass: Unknown entity supplied.");
+	controller.Protected = true;
 end
 
 function LibObject:DefineParams(...)
@@ -338,17 +353,16 @@ function Private:SetClassInterfaces(controller, implements)
     end
 end
 
-function Private:GetNameSpaceList(package, modifier, subset)
-
+function Private:GetNameSpaceList(package, command, subset)
 	local list = core.RootPackage.Framework.Collections.List();
-	
-	for _, value in ipairs(package) do
-		if (type(value) == "table" and value.GetObjectType) then
+
+	for key, value in pairs(package) do
+		if (type(value) == "table" and Controllers[tostring(value)]) then
 			list:Add(value);
-		end		
+		end
 	end	
 		
-	if (modifier ~= "*") then	
+	if (command ~= "*") then	
 		local formattedSubset = {};
 		
 		for id, element in ipairs({strsplit(",", subset)}) do 
@@ -357,9 +371,9 @@ function Private:GetNameSpaceList(package, modifier, subset)
 			end
 		end
 		
-		if (modifier == "+") then
+		if (command == "+") then
 			list:RetainAll(unpack(formattedSubset));			
-		elseif (modifier == "-") then
+		elseif (command == "-") then
 			list:RemoveAll(unpack(formattedSubset));			
 		end
 	end
@@ -379,13 +393,18 @@ function Private:FillTable(tbl, ...)
     until (not arg);
 end
 
-function Private:IsStringNilOrWhiteSpace(string)
-    if (string) then
-        string = string:gsub("%s+", "");
-        if (#string > 0) then
+function Private:IsStringNilOrWhiteSpace(strValue)       
+    if (strValue) then
+
+        assert(type(strValue) == "string", string.format(
+            "(LibObject) Private.IsStringNilOrWhiteSpace: bad argument #1 (string expected, got %s)", type(strValue)));
+
+        strValue = strValue:gsub("%s+", "");
+        if (#strValue > 0) then
             return false;
         end
     end
+
     return true;
 end
 
@@ -453,25 +472,20 @@ function Private:ValidateFunction(definition, message, ...)
     local errorFound;
 
     if (definition) then
-
         local id = 1;
         local arg = (select(id, ...));
 
         repeat      
             -- validate arg:
             if (definition[id]) then
-                errorFound = (not arg) or type(arg) ~= definition[id];
-
+                errorFound = (not arg) or (definition[i] ~= "any" and definition[i] ~= type(arg));
             elseif (definition.Optional and definition.Optional[id]) then
-                errorFound = arg and type(arg) ~= definition.Optional[id];
-
+                errorFound = arg and (definition.Optional[i] ~= "any" and definition.Optional[i] ~= type(arg));
             else
                 errorFound = true;                 
             end
 
-            if (errorFound) then
-                error(message);
-            end
+            assert(not errorFound, message);
 
             id = id + 1;
             arg = (select(id, ...));
