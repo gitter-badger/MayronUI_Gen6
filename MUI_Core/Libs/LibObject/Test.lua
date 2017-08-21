@@ -4,7 +4,7 @@ local function HelloWorld_Test1()
     print("HelloWorld_Test1 Started");
 
     local HelloWorld = lib:CreateClass("HelloWorld");
-    lib:Export(HelloWorld, "Test.Something");
+    lib:Export("Test.Something", HelloWorld);
 
     function HelloWorld:Print(private, msg)
         assert(msg == "My 2nd Message");
@@ -89,14 +89,16 @@ function DefineParams_Test1()
     end
 
     local p = Player();
+    
+    lib:SetSilentErrors(true);
 
     p:GetSpellCasting("Bloodlust"); -- should work!
+    p:GetSpellCasting(123); -- should fail as not a string!
+    p:GetSpellCasting("Flame Shock", 123); -- should work!
+    p:GetSpellCasting("Flame Shock", "123"); -- should fail as not a number!
 
-    -- p:GetSpellCasting(123); -- should fail as not a string!
-
-    -- p:GetSpellCasting("Flame Shock", 123); -- should work!
-
-    -- p:GetSpellCasting("Flame Shock", "123"); -- should fail as not a number!
+    assert(lib:GetErrorLog());
+    lib:SetSilentErrors(false);
 
     print("DefineParams_Test1 Successful!");
 end
@@ -128,13 +130,17 @@ function DefineReturns_Test1()
 
     local p = Player();
 
-    -- print(p:Func1()); -- should work!
+    p:Func1();
 
-    -- print(p:Func2()); -- should work!
+    p:Func2();
 
-    -- print(p:Func3()); -- should fail!
+    lib:SetSilentErrors(true);
 
-    -- print(p:Func4()); -- should fail!
+    p:Func3(); -- should fail!
+    p:Func4(); -- should fail!
+
+    assert(lib:GetErrorLog());
+    lib:SetSilentErrors(false);
 
     print("DefineReturns_Test1 Successful!");
 end
@@ -185,8 +191,8 @@ function DuplicateClass_Test1()
     lib:Export("TestArea", p);
     lib:Export("TestArea", p2); 
 
-    assert(lib:GetErrorLog()); -- errors found!
-
+    assert(lib:GetErrorLog());
+    lib:SetSilentErrors(false);
     print("DuplicateClass_Test1 Successful!");
 end
 
