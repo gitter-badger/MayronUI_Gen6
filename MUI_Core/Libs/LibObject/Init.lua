@@ -129,8 +129,8 @@ function LibObject:CreateClass(className, parent, implements)
 
             Controller.CloneFrom = nil;
 
-        elseif (ProxyClass.__Constructor) then
-            instance:__Constructor(...);
+        elseif (ProxyClass.__Construct) then
+            instance:__Construct(...);
         end
 
         return instance;

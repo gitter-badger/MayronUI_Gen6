@@ -11,8 +11,13 @@ local function HelloWorld_Test1()
         assert(private.secret == "This is a secret!");
     end
 
-    -- problem:
-    function HelloWorld:_Constructor(private, msg)
+    function HelloWorld:__Construct(private, msg)
+        private.secret = "This is a secret!";
+        assert(msg == "My 1st Message");
+        assert(self ~= HelloWorld);
+    end
+
+    function HelloWorld:__Destruct(private, msg)
         private.secret = "This is a secret!";
         assert(msg == "My 1st Message");
         assert(self ~= HelloWorld);
@@ -46,11 +51,11 @@ local function Inheritance_Test1()
     end
 
     -- never gets called
-    function Child:_Constructor(private)
+    function Child:__Construct(private)
         private.Dialog = "I am a child!";
     end
 
-    function Parent:_Constructor(private)
+    function Parent:__Construct(private)
         private.Dialog = "I am a parent.";
     end
 
@@ -193,10 +198,10 @@ end
 ---------------------------------
 -- Run Tests:
 ---------------------------------
--- HelloWorld_Test1();
--- Inheritance_Test1();
--- DefineParams_Test1();
--- DefineReturns_Test1();
--- ExportNamespace_Test1();
--- DuplicateClass_Test1();
+HelloWorld_Test1();
+Inheritance_Test1();
+DefineParams_Test1();
+DefineReturns_Test1();
+ExportNamespace_Test1();
+DuplicateClass_Test1();
 -- ImplementInterface_Test1();
