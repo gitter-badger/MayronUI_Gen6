@@ -18,9 +18,7 @@ local function HelloWorld_Test1()
     end
 
     function HelloWorld:__Destruct(private, msg)
-        private.secret = "This is a secret!";
-        assert(msg == "My 1st Message");
-        assert(self ~= HelloWorld);
+        print("Instance Destroyed");
     end
 
     local instance = HelloWorld("My 1st Message");
@@ -31,6 +29,8 @@ local function HelloWorld_Test1()
 
     local className = instance:GetObjectType();
     assert(className == "HelloWorld", className);
+
+    instance:Destroy();
 
     print("HelloWorld_Test1 Successful!");
 end
@@ -84,8 +84,6 @@ function DefineParams_Test1()
     lib:DefineParams("string", "?number");
     function Player:GetSpellCasting(private, spellName, spellType)
         spellType = spellType or 0;
-
-        print(spellName);
     end
 
     local p = Player();
