@@ -125,9 +125,7 @@ function LibObject:CreateClass(className, parent, implements)
                 error("LibObject: Invalid Clone Object.");
             end
 
-            for key, value in pairs(otherData) do
-                instanceData[key] = value;
-            end
+            instanceData = Private:CopyTable(otherData, instanceData);
 
             Controller.CloneFrom = nil;
 
@@ -200,20 +198,28 @@ function LibObject:Import(namespace, subset)
     local package = core.RootPackage;
 
     for id, key in ipairs({strsplit(".", namespace)}) do    
-        assert(not Private:IsStringNilOrWhiteSpace(key), "LibObject.Import: Invalid namespace.");
+        Private:Assert(not Private:IsStringNilOrWhiteSpace(key), "LibObject.Import: bad argument #1 (invalid namespace).");
 
 		if (key == "*" or key == "+" or key == "-") then
-			package = Private:GetNameSpaceList(package, key, subset);	
+			package = Private:GetNameSpaceMap(package, key, subset);	
             break;
 		else
             package = package[key];
-            assert(package, string.format("LibObject.Import: Invalid namespace \"%s\".", namespace));
+            Private:Assert(package, string.format("LibObject.Import: bad argument #1 (invalid namespace \"%s\").", namespace));
         end
     end
 
-    assert(Controllers[tostring(package)] or package.IsObjectType and package:IsObjectType("List"), "LibObject.Import: Invalid namespace.");
+    Private:Assert(Controllers[tostring(package)] or package.IsObjectType and package:IsObjectType("Map"), "LibObject.Import: bad argument #1 (invalid namespace).");
 
     return package;
+end
+
+function LibObject:SetSilentErrors(silent)
+    Private.silent = silent;
+end
+
+function LibObject:GetErrorLog()
+    return Private.errorLog;
 end
 
 function LibObject:Export(namespace, ...)
@@ -222,7 +228,7 @@ function LibObject:Export(namespace, ...)
 
     if (not Private:IsStringNilOrWhiteSpace(namespace)) then
         for id, key in ipairs({strsplit(".", namespace)}) do        
-            assert(not Private:IsStringNilOrWhiteSpace(key), "LibObject.Import: Invalid namespace argument.");
+            Private:Assert(not Private:IsStringNilOrWhiteSpace(key), "LibObject.Import: bad argument #1 (invalid namespace).");
             key = key:gsub("%s+", "");
             package[key] = package[key] or {};
             package = package[key];
@@ -231,8 +237,8 @@ function LibObject:Export(namespace, ...)
 
     for id, entity in ipairs({...}) do
         controller = Controllers[tostring(entity)];
-        assert(controller, string.format("LibObject.Export: Invalid entities[%s] argument.", id));
-        assert(not package[controller.EntityName], string.format("LibObject.Export: Entities[%s] path already in use.", id));        
+        Private:Assert(controller, string.format("LibObject.Export: bad argument #%s (not entity found).", id + 1));
+        Private:Assert(not package[controller.EntityName], string.format("LibObject.Export: bad argument #%s (path already in use).", id + 1));        
         package[controller.EntityName] = entity;
     end
 end
@@ -241,7 +247,7 @@ end
 function LibObject:ProtectClass(class)
 	local controller = Controllers[tostring(class)];
 
-    assert(controller and controller.IsClass, "LibObject.ProtectClass: Unknown entity supplied.");
+    Private:Assert(controller and controller.IsClass, "LibObject.ProtectClass: bad argument #1 (class not found).");
 	controller.Protected = true;
 end
 
@@ -353,12 +359,12 @@ function Private:SetClassInterfaces(controller, implements)
     end
 end
 
-function Private:GetNameSpaceList(package, command, subset)
-	local list = core.RootPackage.Framework.Collections.List();
+function Private:GetNameSpaceMap(package, command, subset)
+	local map = core.RootPackage.Framework.Collections.Map();
 
 	for key, value in pairs(package) do
 		if (type(value) == "table" and Controllers[tostring(value)]) then
-			list:Add(value);
+			map:Add(key, value);
 		end
 	end	
 		
@@ -372,13 +378,13 @@ function Private:GetNameSpaceList(package, command, subset)
 		end
 		
 		if (command == "+") then
-			list:RetainAll(unpack(formattedSubset));			
+			map:RetainAll(unpack(formattedSubset));			
 		elseif (command == "-") then
-			list:RemoveAll(unpack(formattedSubset));			
+			map:RemoveAll(unpack(formattedSubset));			
 		end
 	end
 	
-	return list;
+	return map;
 end
 
 function Private:FillTable(tbl, ...)
@@ -396,7 +402,7 @@ end
 function Private:IsStringNilOrWhiteSpace(strValue)       
     if (strValue) then
 
-        assert(type(strValue) == "string", string.format(
+        Private:Assert(type(strValue) == "string", string.format(
             "(LibObject) Private.IsStringNilOrWhiteSpace: bad argument #1 (string expected, got %s)", type(strValue)));
 
         strValue = strValue:gsub("%s+", "");
@@ -417,7 +423,7 @@ function Private:SetClassParent(controller, parent)
 			controller.Parent = parent;
 		end
 
-        assert(controller.Parent, "(LibObject) Private.SetClassParent: Invalid parent argument.");
+        Private:Assert(controller.Parent, "(LibObject) Private.SetClassParent: bad argument #2 (invalid parent class).");
 
 	elseif (Private:PathExists(core, "RootPackage.Framework.Generics.Object")) then
         controller.Parent = core.RootPackage.Framework.Generics.Object;
@@ -425,7 +431,7 @@ function Private:SetClassParent(controller, parent)
 end
 
 function Private:PathExists(root, path)
-    assert(root, "(LibObject) Privatge.PathExists: Invalid root argument.");
+    Private:Assert(root, "(LibObject) Privatge.PathExists: bad argument #1 (invalid root).");
 
     for _, key in ipairs({strsplit(".", path)}) do
         if (not root[key]) then
@@ -441,7 +447,7 @@ function Private:GetController(entity)
     local class = getmetatable(entity).Class;
     local controller = Controllers[tostring(class)];
 
-	assert(controller, "(LibObject) Private.GetController: Invalid entity argument.");
+	Private:Assert(controller, "(LibObject) Private.GetController: bad argument #1 (invalid entity).");
 
     return controller;
 end
@@ -485,7 +491,7 @@ function Private:ValidateFunction(definition, message, ...)
                 errorFound = true;                 
             end
 
-            assert(not errorFound, message);
+            Private:Assert(not errorFound, message);
 
             id = id + 1;
             arg = (select(id, ...));
@@ -514,4 +520,27 @@ function Private:GetReturnsDefinition()
     definition = definition and definition.Returns; 
 
     return definition, message;
+end
+
+function Private:CopyTable(tbl, copy)
+    copy = copy or {};
+    for key, value in pairs(tbl) do
+        if (type(value) == "table") then
+            copy[key] = Private:CopyTable(value);
+        else
+            copy[key] = value;
+        end 
+    end
+    return copy;
+end
+
+function Private:Assert(condition, errorMessage)
+    if (not condition) then
+        if (self.silent) then
+            self.errorLog = self.errorLog or {};
+            self.errorLog[#self.errorLog + 1] = pcall(function() error(errorMessage) end);
+        else
+            error(errorMessage);
+        end
+    end
 end

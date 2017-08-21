@@ -157,27 +157,37 @@ function ExportNamespace_Test1()
 
     assert(CheckButton == CheckButton2);
 
-    local packageList = lib:Import("Framework.GUI.Widgets.*");
+    local packageMap = lib:Import("Framework.GUI.Widgets.*");
 
-    print(packageList:Size());
+    print(packageMap:Size());
 
-    packageList:ForEach(function(_, value) print(value) end);
+    packageMap:ForEach(function(className, _) print(className) end);
 
-    -- for key, value in pairs(package) do
-    --     print(string.format("%s : %s", key, tostring(value)));
-    -- end
+    local CheckButton3 = packageMap:Get("CheckButton");
+
+    assert(CheckButton == CheckButton3);
 
     print("ExportNamespace_Test1 Successful!");
+end
+
+function DuplicateClass_Test1()
+    print("DuplicateClass_Test1 Started");
+    lib:SetSilentErrors(true);
+
+    local p = lib:CreateClass("Player");
+    local p2 = lib:CreateClass("Player");
+
+    lib:Export("TestArea", p);
+    lib:Export("TestArea", p2); 
+
+    assert(lib:GetErrorLog()); -- errors found!
+
+    print("DuplicateClass_Test1 Successful!");
 end
 
 function ImplementInterface_Test1()
     print("ImplementInterface_Test1 Started");
     print("ImplementInterface_Test1 Successful!");
-end
-
-function DuplicateClass_Test1()
-    print("DuplicateClass_Test1 Started");
-    print("DuplicateClass_Test1 Successful!");
 end
 
 ---------------------------------
@@ -187,4 +197,6 @@ end
 -- Inheritance_Test1();
 -- DefineParams_Test1();
 -- DefineReturns_Test1();
-ExportNamespace_Test1();
+-- ExportNamespace_Test1();
+-- DuplicateClass_Test1();
+-- ImplementInterface_Test1();
