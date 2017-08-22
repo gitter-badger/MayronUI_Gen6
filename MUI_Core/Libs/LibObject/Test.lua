@@ -196,16 +196,42 @@ end
 
 function ImplementInterface_Test1()
     print("ImplementInterface_Test1 Started");
+
+    local IComparable = lib:CreateInterface("IComparable");
+
+    lib:DefineParams("number", "number");
+    lib:DefineReturns("boolean");
+    function ISortable:Compare(a, b) end
+
+    local Item = lib:CreateClass("Item", nil, IComparable);
+
+    lib:Implements("Compare");
+    function Item:Compare(private, a, b)
+        return a < b;
+    end
+
+    local item1 = Item();
+    assert(item1:Compare(1, 2));
+
+    assert(item:GetObjectType() == "Item");
+    assert(item:IsObjectType("Item")); 
+    assert(item:GetObjectType("IComparable"));
+
     print("ImplementInterface_Test1 Successful!");
+end
+
+function NotImplementedInterface_Test1()
+    print("NotImplementedInterface_Test1 Started");
+    print("NotImplementedInterface_Test1 Successful!");
 end
 
 ---------------------------------
 -- Run Tests:
 ---------------------------------
-HelloWorld_Test1();
-Inheritance_Test1();
-DefineParams_Test1();
-DefineReturns_Test1();
-ExportNamespace_Test1();
-DuplicateClass_Test1();
--- ImplementInterface_Test1();
+-- HelloWorld_Test1();
+-- Inheritance_Test1();
+-- DefineParams_Test1();
+-- DefineReturns_Test1();
+-- ExportNamespace_Test1();
+-- DuplicateClass_Test1();
+ImplementInterface_Test1();

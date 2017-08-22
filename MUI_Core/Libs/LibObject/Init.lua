@@ -42,6 +42,7 @@ function LibObject:CreateClass(className, parent, implements)
     local Controller = {}; -- behind the scenes controller
     local ProxyClass = {}; -- redirect all Class keys to this   
     local ClassMT = {};
+
     local InstanceMT = {}; -- metatable for instances of class 
     local RawClassString = tostring(Class);
 
@@ -182,13 +183,17 @@ end
 
 function LibObject:CreateInterface(interfaceName, ...)
     local Interface = {};
-    local InterfaceController = {};
+    local Controller = {};
+    local InstanceMT = {};
+    local ProxyInterface = {};
 
     Interface.Static = {};
 
+    Controller.Protected = false; -- true if functions and properties are to be protected
     Controller.EntityName = interfaceName;
     Controller.Definitions = {};
-	Controller.IsInterface = true;  
+	Controller.IsInterface = true;
+    Controller.Interface = Interface;
 
     Controllers[tostring(Interface)] = InterfaceController;
     return Interface;
