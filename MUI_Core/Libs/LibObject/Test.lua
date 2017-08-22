@@ -18,7 +18,7 @@ local function HelloWorld_Test1()
     end
 
     function HelloWorld:__Destruct(private, msg)
-        print("Instance Destroyed");
+        -- print("Instance Destroyed"); -- works!
     end
 
     local instance = HelloWorld("My 1st Message");
@@ -87,12 +87,13 @@ function DefineParams_Test1()
     end
 
     local p = Player();
+
+    p:GetSpellCasting("Bloodlust"); -- should work!    
+    p:GetSpellCasting("Flame Shock", 123); -- should work!
     
     lib:SetSilentErrors(true);
 
-    p:GetSpellCasting("Bloodlust"); -- should work!
     p:GetSpellCasting(123); -- should fail as not a string!
-    p:GetSpellCasting("Flame Shock", 123); -- should work!
     p:GetSpellCasting("Flame Shock", "123"); -- should fail as not a number!
 
     assert(lib:GetErrorLog());
@@ -129,7 +130,6 @@ function DefineReturns_Test1()
     local p = Player();
 
     p:Func1();
-
     p:Func2();
 
     lib:SetSilentErrors(true);
@@ -168,9 +168,9 @@ function ExportNamespace_Test1()
 
     local packageMap = lib:Import("Framework.GUI.Widgets.*");
 
-    print(packageMap:Size());
+    assert(packageMap:Size() == 6);
 
-    packageMap:ForEach(function(className, _) print(className) end);
+    -- packageMap:ForEach(function(className, _) print(className) end); -- works!
 
     local CheckButton3 = packageMap:Get("CheckButton");
 

@@ -7,7 +7,7 @@ local List = LibObject:Import("Framework.Collections.List");
 local Map = LibObject:CreateClass("Map");
 LibObject:Export("Framework.Collections", Map);
 
-function Map:__Constructor(private, tbl)
+function Map:__Construct(private, tbl)
     private.values = {};
 end
 

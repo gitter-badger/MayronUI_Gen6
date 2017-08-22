@@ -73,7 +73,7 @@ function Object:Destroy(private)
 	local controller = core.Private:GetController(self);
 
 	if (self.__Destruct) then
-		self:__Destr__Destructuctor();
+		self:__Destruct();
 	end
 
 	for key, _ in pairs(private) do

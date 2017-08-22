@@ -214,14 +214,6 @@ function LibObject:Import(namespace, subset)
     return package;
 end
 
-function LibObject:SetSilentErrors(silent)
-    Private.silent = silent;
-end
-
-function LibObject:GetErrorLog()
-    return Private.errorLog;
-end
-
 function LibObject:Export(namespace, ...)
     local package = core.RootPackage;
     local controller;
@@ -265,6 +257,18 @@ function LibObject:Implements(funcName)
 	end
 
 	DefineImplements = funcName;
+end
+
+function LibObject:SetSilentErrors(silent)
+    Private.silent = silent;
+end
+
+function LibObject:GetErrorLog()
+    return Private.errorLog;
+end
+
+function LibObject:FlushErrorLog()
+    Private:EmptyTable(Private.errorLog);
 end
 
 -------------------------------------
@@ -476,22 +480,28 @@ end
 
 function Private:ValidateFunction(definition, message, ...)
     local errorFound;
+    local errorMessage;
+    local defValue;
 
     if (definition) then
         local id = 1;
-        local arg = (select(id, ...));
+        local arg = (select(id, ...));        
 
-        repeat      
-            -- validate arg:
+        repeat
             if (definition[id]) then
-                errorFound = (not arg) or (definition[i] ~= "any" and definition[i] ~= type(arg));
+                errorFound = (not arg) or (definition[id] ~= "any" and definition[id] ~= type(arg));
+                defValue = definition[id];
             elseif (definition.Optional and definition.Optional[id]) then
-                errorFound = arg and (definition.Optional[i] ~= "any" and definition.Optional[i] ~= type(arg));
+                errorFound = arg and (definition.Optional[id] ~= "any" and definition.Optional[id] ~= type(arg));
+                defValue = definition.Optional[id];
             else
-                errorFound = true;                 
+                errorFound = true; 
+                defValue = "nil";                                
             end
 
-            Private:Assert(not errorFound, message);
+            errorMessage = string.format(message .. " (%s expected, got %s)", defValue, tostring(type(arg)));
+            errorMessage = errorMessage:gsub("##", "#" .. tostring(id));
+            Private:Assert(not errorFound, errorMessage);
 
             id = id + 1;
             arg = (select(id, ...));
@@ -503,7 +513,7 @@ function Private:ValidateFunction(definition, message, ...)
 end
 
 function Private:GetParamsDefinition()
-    local message = string.format("LibObject: Incorrect argument type[s] found for %s.%s", 
+    local message = string.format("LibObject: bad argument ## to '%s.%s'", 
         ProxyFunction.Controller.EntityName, ProxyFunction.Key);
 
     local definition = ProxyFunction.Controller.Definitions[ProxyFunction.Key];
@@ -513,7 +523,7 @@ function Private:GetParamsDefinition()
 end
 
 function Private:GetReturnsDefinition()
-    local message = string.format("LibObject: Incorrect return type[s] found for %s.%s", 
+    local message = string.format("LibObject: bad return value ## to '%s.%s'", 
         ProxyFunction.Controller.EntityName, ProxyFunction.Key);
 
     local definition = ProxyFunction.Controller.Definitions[ProxyFunction.Key];
