@@ -211,17 +211,40 @@ function Interfaces_Test1()
     end
 
     local item1 = Item();
-    assert(item1:Compare(1, 2));
+    assert(item1:Compare(19, 20));
 
-    assert(item:GetObjectType() == "Item");
-    assert(item:IsObjectType("Item")); 
-    assert(item:GetObjectType("IComparable"));
+    assert(item1:GetObjectType() == "Item");
+    assert(item1:IsObjectType("Item")); 
+    assert(item1:IsObjectType("IComparable"));
 
     print("Interfaces_Test1 Successful!");
 end
 
 function Interfaces_Test2()
     print("Interfaces_Test2 Started");
+
+    local ICell = lib:CreateInterface("ICell");
+
+    function ICell:Create() end
+    function ICell:Update() end
+    function ICell:Destroy() end
+
+    -- local IPanel = lib:CreateInterface("IPanel");
+    -- function IPanel:Create() end -- not allowed (works!)
+
+    -- local Panel = lib:CreateClass("Panel", nil, IPanel, ICell);
+    local Panel = lib:CreateClass("Panel", nil, ICell);
+
+    --lib:DefineParams("string")
+    lib:Implements("Create");
+    function Panel:Create(a) end
+
+    lib:Implements("Destroy");
+    function Panel:Destroy(a) end
+
+    lib:Implements("Update");
+    function Panel:Update(a) end
+
     print("Interfaces_Test2 Successful!");
 end
 
@@ -234,4 +257,5 @@ end
 -- DefineReturns_Test1();
 -- ExportNamespace_Test1();
 -- DuplicateClass_Test1();
-Interfaces_Test1();
+-- Interfaces_Test1();
+-- Interfaces_Test2();

@@ -56,6 +56,7 @@ function LibObject:CreateClass(className, parent, ...)
     Controller.Definitions = {};
 	Controller.IsClass = true;
     Controller.Class = Class;
+    Controller.ProxyClass = ProxyClass;
 	
     Private:SetClassParent(Controller, parent);
 	Private:SetClassInterfaces(Controller, ...);    
@@ -66,19 +67,14 @@ function LibObject:CreateClass(className, parent, ...)
     -- get a value
     InstanceMT.__index = function(instance, key)
         local ProxyInstance = Controller.ProxyInstances[tostring(instance)];
-        local PrivateData = Controller.PrivateInstanceData[tostring(instance)];
-
         local value = ProxyInstance[key];
 
-        if (type(value) == "function") then
-            value = ProxyFunction:Setup(ProxyInstance, key, instance, Controller);        
-
-        elseif (not value) then
-            value = Class[key] or (Controller.Parent and Controller.Parent[key]); -- problem chaining
+        if (not value) then
+            value = Class[key];
 
             if (type(value) == "function") then
-                ProxyFunction.Instance = instance; -- 1st argument of ProxyFunction call
-                ProxyFunction.Private = Controller.PrivateInstanceData[tostring(instance)]; -- 2nd argument of ProxyFunction call (Private Instance data)   
+                ProxyFunction.Instance = instance;
+                ProxyFunction.Private = Controller.PrivateInstanceData[tostring(instance)];  
             end
         end
         
@@ -89,14 +85,12 @@ function LibObject:CreateClass(className, parent, ...)
     InstanceMT.__newindex = function(instance, key, value)
         local ProxyInstance = Controller.PrivateInstanceData[tostring(instance)];
 
-        if (Class[key] and Controller.Protected) then
-            Private:Error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
-        else
-            if (type(value) == "function") then      
-                Private:AttachDefines(Controller, key);
-            end
-            ProxyInstance[key] = value;
-        end
+		if (type(value) == "function") then      
+			Private:AttachDefines(Controller, key);
+		end
+		
+		Private:Assert(type(value) ~= "function", "LibObject: Only unprotected classes can be assigned new function values (not instances).");
+		ProxyInstance[key] = value;
     end
 
     InstanceMT.__gc = function(self)
@@ -134,17 +128,17 @@ function LibObject:CreateClass(className, parent, ...)
         return instance;
     end
 
-    ClassMT.__index = function(entity, key) -- object: instance or class table
+    ClassMT.__index = function(class, key)
         local value = ProxyClass[key];
 
         if (type(value) == "function") then
-            value = ProxyFunction:Setup(ProxyClass, key, entity, Controller);        
+            value = ProxyFunction:Setup(ProxyClass, key, class, Controller);        
 
         elseif (not value) then
             value = Controller.Parent and Controller.Parent[key];
 
             if (type(value) == "function") then
-                ProxyFunction.Instance = entity; -- 1st argument of ProxyFunction call
+                ProxyFunction.Instance = class;
             end
         end
 
@@ -154,16 +148,17 @@ function LibObject:CreateClass(className, parent, ...)
     -- set new value (always true)
     ClassMT.__newindex = function(class, key, value)
         if (key ~= "Static") then
-            if (ProxyClass[key] and Controller.Protected) then
-                Private:Error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
+            if (Controller.Protected) then
+                Private:Error(string.format("LibObject: %s is protected.", Controller.EntityName));
             end
 
-            if (type(value) == "function") then            
+            if (type(value) == "function") then
                 Private:AttachDefines(Controller, key);
-                ProxyClass[key] = value;
-            else
-                Class.Static[key] = value;
+                ProxyClass[key] = value;				
+			else
+                Private:Error(string.format("LibObject: Static properties must be located in %s.Static.", Controller.EntityName));
             end
+            	
         else
             Private:Error(string.format("LibObject: %s.Static property is protected.", Controller.EntityName));
         end
@@ -178,18 +173,25 @@ function LibObject:CreateClass(className, parent, ...)
     return Class;
 end
 
-function LibObject:CreateInterface(interfaceName, ...)
+function LibObject:CreateInterface(interfaceName)
     local Interface = {};
     local Controller = {};
-
-    Interface.Static = {};
+	local InterfaceMT = {};	
 
     Controller.Protected = false; -- true if functions and properties are to be protected
     Controller.EntityName = interfaceName;
     Controller.Definitions = {};
 	Controller.IsInterface = true;
     Controller.Interface = Interface;
+	
+	InterfaceMT.__newindex = function(interface, key, value)
+		if (type(value) == "function") then            
+			Private:AttachDefines(Controller, key);
+		end	
+		rawset(interface, key, value);
+	end
 
+	setmetatable(Interface, InterfaceMT);
     Controllers[tostring(Interface)] = Controller;
     return Interface;
 end
@@ -320,12 +322,19 @@ frame:SetScript("OnEvent", function(self, _, otherAddonName)
                 for key, value in pairs(interface) do
                     if (type(value) == "function") then
 
-                        Private:Assert(class[key], 
-                            string.format("LibObject: %s does not implement interface function '%s'.", 
-                                controller.EntityName, key));
+                        Private:Assert(controller.ProxyClass[key], string.format(
+                            "LibObject: %s does not implement interface function '%s'.", controller.EntityName, key));
 
+                        Private:Assert(not controller.ImplementFunctions[key], string.format(
+                            "LibObject: Missing \"lib:Implements('%s')\" function declaration.", key));                        
                     end
+
                 end
+            end
+
+            for key, _ in pairs(controller.ImplementFunctions) do
+                Private:Error(string.format(
+                    "LibObject: %s does not implement interface function '%s'.", controller.EntityName, key));
             end
         end
     end
@@ -340,21 +349,33 @@ function Private:EmptyTable(tbl)
     end
 end
 
-function Private:AttachDefines(Controller, funcKey)
+function Private:AttachDefines(controller, funcKey)
     if (DefineImplement.FuncKey) then
         Private:Assert(DefineImplement.FuncKey == funcKey, 
             string.format("LibObject: %s does not implement interface function '%s'.", 
-                Controller.EntityName, DefineImplement.FuncKey));
+                controller.EntityName, DefineImplement.FuncKey));
 
-        for _, interface in ipairs(Controller.Interfaces) do
-            if (interface[funcKey]) then
+		local interfaceDefFound = false;
+        for _, interface in ipairs(controller.Interfaces) do
+            if (interface[funcKey]) then			
+				Private:Assert(not interfaceDefFound, 
+				    string.format("LibObject: Multiple interface definitions found for function '%s'", funcKey)); 
+			
                 local interfaceController = Controllers[tostring(interface)];
                 local funcDef = interfaceController.Definitions[funcKey]; -- a nil value
 
-                DefineParams = funcDef.Params;
-                DefineReturns = funcDef.Returns;
+                if (funcDef) then
+                    DefineParams = funcDef.Params;
+                    DefineReturns = funcDef.Returns;
+                end
+
+                DefineImplement.FuncKey = nil;
+				interfaceDefFound = true;
+                controller.ImplementFunctions[funcKey] = nil;
             end
         end
+        Private:Assert(interfaceDefFound, 
+            string.format("LibObject: Failed to find interface definition for function '%s'", funcKey)); 
     end
 
     if (#DefineParams > 0 or #DefineReturns > 0) then
@@ -374,23 +395,37 @@ function Private:AttachDefines(Controller, funcKey)
         Private:EmptyTable(DefineParams);
         Private:EmptyTable(DefineReturns);
 
-        Private:Assert(not Controller.Definitions[funcKey], 
+        Private:Assert(not controller.Definitions[funcKey], 
                 string.format("LibObject: %s.%s Definition already exists.",  
-                        Controller.EntityName, funcKey));
+                        controller.EntityName, funcKey));
 
-        Controller.Definitions[funcKey] = funcDef;
+        controller.Definitions[funcKey] = funcDef;
     end
 end
 
 function Private:SetClassInterfaces(controller, ...) 
-	controller.Interfaces = {};
+	controller.Interfaces = {};    
+    controller.ImplementFunctions = {};
 
     for id, interface in ipairs({...}) do
         if (type(interface) == "string") then
             interface = LibObject:Import(interface);
         end
 
-        if (Controllers[tostring(interface)] and Controllers[tostring(interface)].IsInterface) then
+        local interfaceController = Controllers[tostring(interface)];
+        if (interfaceController and interfaceController.IsInterface) then
+
+            for key, value in pairs(interface) do
+                if (type(value) == "function") then
+
+                    Private:Assert(not controller.ImplementFunctions[key], 
+                        string.format("LibObject: '%s' cannot implement function '%s', " ..
+                        "as 2 or more interfaces share the same function key.", controller.EntityName, key));
+
+                    controller.ImplementFunctions[key] = true;
+                end
+            end
+
             table.insert(controller.Interfaces, interface);           
         else
             Private:Error(string.format("(LibObject) Private.SetClassInterfaces: bad argument #%d (invalid interface)", id));
@@ -398,6 +433,7 @@ function Private:SetClassInterfaces(controller, ...)
     end 
 
     if (#controller.Interfaces > 0) then
+        
         table.insert(ClassesImplementing, controller.Class);
     end   
 end
@@ -533,14 +569,14 @@ function Private:ValidateFunction(definition, message, ...)
 
         repeat
             if (definition[id]) then
-                errorFound = (not arg) or (definition[id] ~= "any" and definition[id] ~= type(arg));
+                errorFound = (arg == nil) or (definition[id] ~= "any" and definition[id] ~= type(arg));
                 defValue = definition[id];
             elseif (definition.Optional and definition.Optional[id]) then
-                errorFound = arg and (definition.Optional[id] ~= "any" and definition.Optional[id] ~= type(arg));
+                errorFound = (arg ~= nil) and (definition.Optional[id] ~= "any" and definition.Optional[id] ~= type(arg));
                 defValue = definition.Optional[id];
             else
                 errorFound = true; 
-                defValue = "nil";                                
+                defValue = "nil";              
             end
 
             errorMessage = string.format(message .. " (%s expected, got %s)", defValue, tostring(type(arg)));
