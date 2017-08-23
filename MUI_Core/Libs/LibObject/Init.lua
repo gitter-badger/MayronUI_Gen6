@@ -24,9 +24,10 @@ local Private = {};
 
 local DefineParams = {};
 local DefineReturns = {};
-local DefineImplements = {};
+local DefineImplement = {};
 
 local Controllers = {};
+local ClassesImplementing = {}; -- classes that implement interfaces
 local ProxyFunction = {};
 
 core.Lib = LibObject;
@@ -37,7 +38,7 @@ core.Private = Private;
 --------------------------------------------
 -- LibObject Functions
 --------------------------------------------
-function LibObject:CreateClass(className, parent, implements)
+function LibObject:CreateClass(className, parent, ...)
     local Class = {};
     local Controller = {}; -- behind the scenes controller
     local ProxyClass = {}; -- redirect all Class keys to this   
@@ -57,7 +58,7 @@ function LibObject:CreateClass(className, parent, implements)
     Controller.Class = Class;
 	
     Private:SetClassParent(Controller, parent);
-	Private:SetClassInterfaces(Controller, implements);    
+	Private:SetClassInterfaces(Controller, ...);    
 
     InstanceMT.Class = Class;
     ClassMT.Class = Class;
@@ -89,9 +90,9 @@ function LibObject:CreateClass(className, parent, implements)
         local ProxyInstance = Controller.PrivateInstanceData[tostring(instance)];
 
         if (Class[key] and Controller.Protected) then
-            error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
+            Private:Error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
         else
-            if (type(value) == "function") then                
+            if (type(value) == "function") then      
                 Private:AttachDefines(Controller, key);
             end
             ProxyInstance[key] = value;
@@ -121,13 +122,9 @@ function LibObject:CreateClass(className, parent, implements)
         if (Controller.CloneFrom) then
             local other = Controller.CloneFrom;
             local otherData = Controller.PrivateInstanceData[tostring(other)];
-            
-            if (not otherData) then
-                error("LibObject: Invalid Clone Object.");
-            end
 
+            Private:Assert(otherData, "LibObject: Invalid Clone Object.");
             instanceData = Private:CopyTable(otherData, instanceData);
-
             Controller.CloneFrom = nil;
 
         elseif (ProxyClass.__Construct) then
@@ -158,17 +155,17 @@ function LibObject:CreateClass(className, parent, implements)
     ClassMT.__newindex = function(class, key, value)
         if (key ~= "Static") then
             if (ProxyClass[key] and Controller.Protected) then
-                error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
+                Private:Error(string.format("LibObject: %s.%s is protected.", Controller.EntityName, key));
             end
 
-            if (type(value) == "function") then                
+            if (type(value) == "function") then            
                 Private:AttachDefines(Controller, key);
                 ProxyClass[key] = value;
             else
                 Class.Static[key] = value;
             end
         else
-            error(string.format("LibObject: %s.Static property is protected.", Controller.EntityName));
+            Private:Error(string.format("LibObject: %s.Static property is protected.", Controller.EntityName));
         end
     end
 
@@ -184,8 +181,6 @@ end
 function LibObject:CreateInterface(interfaceName, ...)
     local Interface = {};
     local Controller = {};
-    local InstanceMT = {};
-    local ProxyInterface = {};
 
     Interface.Static = {};
 
@@ -195,7 +190,7 @@ function LibObject:CreateInterface(interfaceName, ...)
 	Controller.IsInterface = true;
     Controller.Interface = Interface;
 
-    Controllers[tostring(Interface)] = InterfaceController;
+    Controllers[tostring(Interface)] = Controller;
     return Interface;
 end
 
@@ -257,11 +252,8 @@ function LibObject:DefineReturns(...)
 end
 
 function LibObject:Implements(funcName)
-	if (DefineImplements) then
-		error(string.format("LibObject: %s was not implemented", funcName));	
-	end
-
-	DefineImplements = funcName;
+    Private:Assert(not DefineImplement.FuncKey, string.format("LibObject: %s was not implemented", funcName));
+	DefineImplement.FuncKey = funcName;
 end
 
 function LibObject:SetSilentErrors(silent)
@@ -284,10 +276,17 @@ ProxyFunction.Run = function(self, ...)
 
     Private:ValidateFunction(definition, message, ...);
 
-    if (not ProxyFunction.Private) then     
-        error(string.format("LibObject: %s.%s is a non static " .. 
-                "function and must be invoked by an instance object.", 
-                ProxyFunction.Controller.EntityName, ProxyFunction.Key));
+    if (not ProxyFunction.Private) then
+
+        if (ProxyFunction.Controller.IsInterface) then
+            Private:Error(string.format("LibObject: %s.%s is an interface function " .. 
+                    "and must be implemented and invoked by an instance object.", 
+                    ProxyFunction.Controller.EntityName, ProxyFunction.Key));
+        else
+            Private:Error(string.format("LibObject: %s.%s is a non static " .. 
+                    "function and must be invoked by an instance object.", 
+                    ProxyFunction.Controller.EntityName, ProxyFunction.Key));
+        end
     end
 
     definition, message = Private:GetReturnsDefinition();
@@ -311,11 +310,24 @@ local frame = CreateFrame("Frame");
 frame:RegisterEvent("ADDON_LOADED");
 
 frame:SetScript("OnEvent", function(self, _, otherAddonName)
-	-- iterate over every class to check if it has implemented the interface functions
     if (addonName == otherAddonName) then
         self:UnregisterEvent("ADDON_LOADED");
 
-        -- check all interfaces to make sure loaded correctly.
+        for _, class in ipairs(ClassesImplementing) do
+            local controller = Controllers[tostring(class)];
+
+            for _, interface in ipairs(controller.Interfaces) do
+                for key, value in pairs(interface) do
+                    if (type(value) == "function") then
+
+                        Private:Assert(class[key], 
+                            string.format("LibObject: %s does not implement interface function '%s'.", 
+                                controller.EntityName, key));
+
+                    end
+                end
+            end
+        end
     end
 end);
 
@@ -329,6 +341,22 @@ function Private:EmptyTable(tbl)
 end
 
 function Private:AttachDefines(Controller, funcKey)
+    if (DefineImplement.FuncKey) then
+        Private:Assert(DefineImplement.FuncKey == funcKey, 
+            string.format("LibObject: %s does not implement interface function '%s'.", 
+                Controller.EntityName, DefineImplement.FuncKey));
+
+        for _, interface in ipairs(Controller.Interfaces) do
+            if (interface[funcKey]) then
+                local interfaceController = Controllers[tostring(interface)];
+                local funcDef = interfaceController.Definitions[funcKey]; -- a nil value
+
+                DefineParams = funcDef.Params;
+                DefineReturns = funcDef.Returns;
+            end
+        end
+    end
+
     if (#DefineParams > 0 or #DefineReturns > 0) then
 
         local funcDef = {};
@@ -346,26 +374,32 @@ function Private:AttachDefines(Controller, funcKey)
         Private:EmptyTable(DefineParams);
         Private:EmptyTable(DefineReturns);
 
-        if (Controller.Definitions[funcKey]) then
-            error(string.format("LibObject: %s.%s Definition already exists.", 
-                                                    Controller.EntityName, funcKey));
-        end
+        Private:Assert(not Controller.Definitions[funcKey], 
+                string.format("LibObject: %s.%s Definition already exists.",  
+                        Controller.EntityName, funcKey));
 
         Controller.Definitions[funcKey] = funcDef;
     end
 end
 
-function Private:SetClassInterfaces(controller, implements)  
+function Private:SetClassInterfaces(controller, ...) 
 	controller.Interfaces = {};
-	
-    if (not Private:IsStringNilOrWhiteSpace(implements)) then
-        for id, interface in ipairs({strsplit(",", implements)}) do 			
-            if (not Private:IsStringNilOrWhiteSpace(interface)) then
-                interface = interface:gsub("%s+", "");			
-                table.insert(controller.Interfaces, LibObject:Import(interface));
-            end
-        end	
-    end
+
+    for id, interface in ipairs({...}) do
+        if (type(interface) == "string") then
+            interface = LibObject:Import(interface);
+        end
+
+        if (Controllers[tostring(interface)] and Controllers[tostring(interface)].IsInterface) then
+            table.insert(controller.Interfaces, interface);           
+        else
+            Private:Error(string.format("(LibObject) Private.SetClassInterfaces: bad argument #%d (invalid interface)", id));
+        end
+    end 
+
+    if (#controller.Interfaces > 0) then
+        table.insert(ClassesImplementing, controller.Class);
+    end   
 end
 
 function Private:GetNameSpaceMap(package, command, subset)
@@ -453,9 +487,14 @@ function Private:PathExists(root, path)
 end
 
 function Private:GetController(entity)
-    local class = getmetatable(entity).Class;
-    local controller = Controllers[tostring(class)];
+    local controller = Controllers[tostring(entity)];
 
+    if (controller) then
+        return controller;
+    end
+
+    local class = getmetatable(entity).Class;
+    controller = Controllers[tostring(class)];
 	Private:Assert(controller, "(LibObject) Private.GetController: bad argument #1 (invalid entity).");
 
     return controller;
@@ -475,7 +514,7 @@ function Private:DefineFunction(defTable, ...)
                 defTable.Optional[id] = valueType;
 
             elseif (defTable.Optional) then
-                error("(LibObject) Private.DefineFunction: Optional values must appear at the end of the definition list.");
+                Private:Error("(LibObject) Private.DefineFunction: Optional values must appear at the end of the definition list.");
             else
                 defTable[id] = valueType;
             end
@@ -558,4 +597,8 @@ function Private:Assert(condition, errorMessage)
             error(errorMessage);
         end
     end
+end
+
+function Private:Error(errorMessage)
+    self:Assert(false, errorMessage);
 end

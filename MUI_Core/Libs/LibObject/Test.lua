@@ -194,14 +194,14 @@ function DuplicateClass_Test1()
     print("DuplicateClass_Test1 Successful!");
 end
 
-function ImplementInterface_Test1()
-    print("ImplementInterface_Test1 Started");
+function Interfaces_Test1()
+    print("Interfaces_Test1 Started");
 
     local IComparable = lib:CreateInterface("IComparable");
 
     lib:DefineParams("number", "number");
     lib:DefineReturns("boolean");
-    function ISortable:Compare(a, b) end
+    function IComparable:Compare(a, b) end
 
     local Item = lib:CreateClass("Item", nil, IComparable);
 
@@ -217,12 +217,12 @@ function ImplementInterface_Test1()
     assert(item:IsObjectType("Item")); 
     assert(item:GetObjectType("IComparable"));
 
-    print("ImplementInterface_Test1 Successful!");
+    print("Interfaces_Test1 Successful!");
 end
 
-function NotImplementedInterface_Test1()
-    print("NotImplementedInterface_Test1 Started");
-    print("NotImplementedInterface_Test1 Successful!");
+function Interfaces_Test2()
+    print("Interfaces_Test2 Started");
+    print("Interfaces_Test2 Successful!");
 end
 
 ---------------------------------
@@ -234,4 +234,4 @@ end
 -- DefineReturns_Test1();
 -- ExportNamespace_Test1();
 -- DuplicateClass_Test1();
-ImplementInterface_Test1();
+Interfaces_Test1();

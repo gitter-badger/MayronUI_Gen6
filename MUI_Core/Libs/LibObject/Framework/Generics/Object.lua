@@ -16,6 +16,13 @@ function Object:IsObjectType(private, objectName)
 	if (controller.EntityName == objectName) then
 		return true;
 	else
+		for _, interface in ipairs(controller.Interfaces) do
+			local interfaceController = core.Private:GetController(interface);
+			if (interfaceController.EntityName == objectName) then
+				return true;
+			end
+		end
+
 		controller = core.Private:GetController(controller.Parent);
 
 		while (controller) do
