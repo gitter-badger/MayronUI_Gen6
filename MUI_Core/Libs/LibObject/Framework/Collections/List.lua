@@ -5,7 +5,7 @@ if (not LibObject) then return; end
 local List = LibObject:CreateClass("List");
 LibObject:Export("Framework.Collections", List);
 
-function List:__Constructor(private, ...)
+function List:__Construct(private, ...)
     private.values = {};
     self:AddAll(...);
 end

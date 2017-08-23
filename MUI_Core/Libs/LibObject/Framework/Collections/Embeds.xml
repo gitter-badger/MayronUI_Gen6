@@ -3,5 +3,7 @@
 
 	<Script file="List.lua"/>	
 	<Script file="Map.lua"/>
+	<Script file="Stack.lua"/>
+	<Script file="LinkedList.lua"/>
 	
 </Ui>
