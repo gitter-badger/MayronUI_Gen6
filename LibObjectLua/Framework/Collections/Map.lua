@@ -2,13 +2,24 @@ local _, core = ...;
 local LibObject = core.Lib;
 if (not LibObject) then return; end
 
-local List = LibObject:Import("Framework.Collections.List");
+local package = LibObject:Import("Framework.Collections");
+local List = package:Get("List");
+
+-- local Something = package:Using("Framework.Test");
+-- LibObject:Export(package, "Framework");
 
 local Map = LibObject:CreateClass("Map");
 LibObject:Export("Framework.Collections", Map);
 
+LibObject:DefineParams("?table");
 function Map:__Construct(private, tbl)
     private.values = {};
+
+    if (tbl) then
+        for key, value in pairs(tbl) do
+            self:Add(key, value);
+        end
+    end
 end
 
 function Map:Add(private, key, value)
