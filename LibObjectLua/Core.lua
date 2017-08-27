@@ -14,7 +14,7 @@ for i = 1, NUM_CHAT_WINDOWS do
 end
 --------------------------------------------
 --------------------------------------------
-local Lib = LibStub:NewLibrary("LibObjectLua", 1.0);
+local Lib = LibStub:NewLibrary("LibObjectLua", 2.0);
 if (not Lib) then return; end
 
 local error, assert, rawget, rawset = error, assert, rawget, rawset;

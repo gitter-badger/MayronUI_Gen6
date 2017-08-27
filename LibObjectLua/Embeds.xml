@@ -1,7 +1,12 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
 
+	<!-- System: -->
 	<Script file="Framework\System\Package.lua" />
 	<Script file="Framework\System\Object.lua" />
+
+	<!-- Collections: -->
+	<Script file="Framework\Collections\List.lua" />
+	<Script file="Framework\Collections\Map.lua" />
 
 </Ui>

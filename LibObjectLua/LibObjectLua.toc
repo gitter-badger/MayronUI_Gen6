@@ -1,11 +1,9 @@
 ## Interface: 70200
 ## Title: LibObjectLua
-## Version: 0.1
+## Version: 2.0
 
 ## initializer:
 LibStub.lua
 
 Core.lua
 Embeds.xml
-
-Test.lua

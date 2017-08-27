@@ -1,30 +1,30 @@
-local _, core = ...;
-local LibObject = core.Lib;
-if (not LibObject) then return; end
+local _, Core = ...;
+local Lib = Core.Lib;
+if (not Lib) then return; end
 
-local List = LibObject:CreateClass("List");
-LibObject:Export("Framework.Collections", List);
+local Collections = Lib:CreatePackage("Collections", "Framework");
+local List = Collections:CreateClass("List");
 
-function List:__Construct(private, ...)
-    private.values = {};
+function List:__Construct(data, ...)
+    data.values = {};
     self:AddAll(...);
 end
 
-function List:Add(private, value, index)
+function List:Add(data, value, index)
     if (index) then
-        table.insert(private.values, index, value);
+        table.insert(data.values, index, value);
     else
-        table.insert(private.values, value);
+        table.insert(data.values, value);
     end
 end
 
-function List:Remove(private, index)
-    table.remove(private.values, index);
+function List:Remove(data, index)
+    table.remove(data.values, index);
 end
 
-function List:RemoveByValue(private, value, allValues)
+function List:RemoveByValue(data, value, allValues)
     local index = 1;
-    local value2 = private.values[index];
+    local value2 = data.values[index];
 
     while (value2) do
         if (value2 == value) then
@@ -36,19 +36,19 @@ function List:RemoveByValue(private, value, allValues)
             index = index + 1;
         end
 
-        value2 = private.values[index];
+        value2 = data.values[index];
     end
 end
 
-function List:ForEach(private, func)
-    for index, value in ipairs(private.values) do
+function List:ForEach(data, func)
+    for index, value in ipairs(data.values) do
         func(index, value);
     end
 end
 
-function List:Filter(private, predicate)
+function List:Filter(data, predicate)
     local index = 1;
-    local value = private.values[index];
+    local value = data.values[index];
 
     while (value) do
         if (predicate(index, value)) then
@@ -57,14 +57,14 @@ function List:Filter(private, predicate)
             index = index + 1;
         end
 
-        value = private.values[index];
+        value = data.values[index];
     end
 end
 
-function List:Select(private, predicate)
+function List:Select(data, predicate)
     local selected = {};
 
-    for index, value in ipairs(private.values) do
+    for index, value in ipairs(data.values) do
         if (predicate(index, value)) then
             selected[#selected] = value;
         end
@@ -73,23 +73,25 @@ function List:Select(private, predicate)
     return selected;
 end
 
-local function iter(values, index)
-    index = index + 1;
-    if (values[index]) then
-        return index, values[index];
+do
+    local function iter(values, index)
+        index = index + 1;
+        if (values[index]) then
+            return index, values[index];
+        end
+    end
+
+    function List:Iterate(data)
+        return iter, data.values, 0;
     end
 end
 
-function List:Iterate(private)
-    return iter, private.values, 0;
+function List:Get(data, index)
+    return data.values[index];
 end
 
-function List:Get(private, index)
-    return private.values[index];
-end
-
-function List:Contains(private, value)    
-    for index, value2 in ipairs(private.values) do
+function List:Contains(data, value)    
+    for index, value2 in ipairs(data.values) do
         if (value2 == value) then
             return true;
         end
@@ -97,44 +99,44 @@ function List:Contains(private, value)
     return false;
 end
 
-function List:Empty(private)
-    for index, _ in ipairs(private.values) do
-        private.values[index] = nil;
+function List:Empty(data)
+    for index, _ in ipairs(data.values) do
+        data.values[index] = nil;
     end
 end
 
-function List:IsEmpty(private)
-    return #private.values > 0;
+function List:IsEmpty(data)
+    return #data.values > 0;
 end
 
-function List:Size(private)
-    return #private.values;
+function List:Size(data)
+    return #data.values;
 end
 
-function List:ToTable(private)
+function List:ToTable(data)
     local copy = {};
 
-    for index, value in ipairs(private.values) do
+    for index, value in ipairs(data.values) do
         copy[index] = value;
     end
 
     return copy;
 end
 
-function List:AddAll(private, ...)
-    for _, value in ipairs({...}) do
-        table.insert(private.values, value);
+function List:AddAll(data, ...)
+    for _, value in Core:IterateArgs(...) do
+        table.insert(data.values, value);
     end    
 end
 
-function List:RemoveAll(private, ...)
-    for _, value in ipairs({...}) do
+function List:RemoveAll(data, ...)
+    for _, value in Core:IterateArgs(...) do
         self:RemoveByValue(value);
     end
 end
 
-function List:RetainAll(private, ...)
-    for _, value in ipairs({...}) do
+function List:RetainAll(data, ...)
+    for _, value in Core:IterateArgs(...) do
         if (not self:Contains(value)) then
             self:RemoveByValue(value);
         end

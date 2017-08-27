@@ -1,19 +1,15 @@
-local _, core = ...;
-local LibObject = core.Lib;
-if (not LibObject) then return; end
+local _, Core = ...;
+local Lib = Core.Lib;
+if (not Lib) then return; end
 
-local package = LibObject:Import("Framework.Collections");
-local List = package:Get("List");
+local Collections = Lib:Import("Framework.Collections");
+local List = Collections:Get("List");
 
--- local Something = package:Using("Framework.Test");
--- LibObject:Export(package, "Framework");
+local Map = Collections:CreateClass("Map");
 
-local Map = LibObject:CreateClass("Map");
-LibObject:Export("Framework.Collections", Map);
-
-LibObject:DefineParams("?table");
-function Map:__Construct(private, tbl)
-    private.values = {};
+Collections:DefineParams("?table");
+function Map:__Construct(data, tbl)
+    data.values = {};
 
     if (tbl) then
         for key, value in pairs(tbl) do
@@ -22,30 +18,30 @@ function Map:__Construct(private, tbl)
     end
 end
 
-function Map:Add(private, key, value)
-    assert(not private.values[key], "(LibObject) Map.Add: key already exists.");
-    private.values[key] = value;
+function Map:Add(data, key, value)
+    Core:Assert(not data.values[key], "Map.Add - key '%s' already exists.", key);
+    data.values[key] = value;
 end
 
-function Map:AddAll(private, keyValues)
+function Map:AddAll(data, keyValues)
     for key, value in pairs(keyValues) do
         self:Add(key, value);
     end    
 end
 
-function Map:Remove(private, key)
-    assert(private.values[key], "(LibObject) Map.Add: key not found.");
-    private.values[key] = nil;
+function Map:Remove(data, key)
+    Core:Assert(data.values[key], "Map.Add: key '%s' not found.", key);
+    data.values[key] = nil;
 end
 
-function Map:RemoveAll(private, keys)
+function Map:RemoveAll(data, keys)
     for _, key in ipairs(keys) do
         self:Remove(key);
     end    
 end
 
-function Map:RetainAll(private, keys)
-    for key, _ in pairs(private.values) do
+function Map:RetainAll(data, keys)
+    for key, _ in pairs(data.values) do
         local keyExists = false;
 
         for _, retainKey in ipairs(keys) do
@@ -61,10 +57,10 @@ function Map:RetainAll(private, keys)
     end    
 end
 
-function Map:RemoveByValue(private, value, allValues)
-    for key, value2 in pairs(private.values) do
+function Map:RemoveByValue(data, value, allValues)
+    for key, value2 in pairs(data.values) do
         if (value2 == value) then
-            private.values[key] = nil;
+            data.values[key] = nil;
             if (not allValues) then
                 break;
             end
@@ -72,32 +68,32 @@ function Map:RemoveByValue(private, value, allValues)
     end
 end
 
-function Map:Get(private, key)
-    return private.values[key];
+function Map:Get(data, key)
+    return data.values[key];
 end
 
-function Map:Contains(private, value)
+function Map:Contains(data, value)
     return (self:GetByValue(value)) ~= nil;
 end
 
-function Map:ForEach(private, func)
-    for key, value in pairs(private.values) do
+function Map:ForEach(data, func)
+    for key, value in pairs(data.values) do
         func(key, value);
     end
 end
 
-function Map:Filter(private, predicate)
-    for key, value in pairs(private.values) do
+function Map:Filter(data, predicate)
+    for key, value in pairs(data.values) do
         if (predicate(key, value)) then
             self:Remove(key);
         end
     end
 end
 
-function Map:Select(private, predicate)
+function Map:Select(data, predicate)
     local selected = {};
 
-    for key, value in pairs(private.values) do
+    for key, value in pairs(data.values) do
         if (predicate(key, value)) then
             selected[key] = value;
         end
@@ -106,45 +102,45 @@ function Map:Select(private, predicate)
     return selected;
 end
 
-function Map:Empty(private)
-    for key, _ in pairs(private.values) do
-        private.values[key] = nil;
+function Map:Empty(data)
+    for key, _ in pairs(data.values) do
+        data.values[key] = nil;
     end
 end
 
-function Map:IsEmpty(private)
+function Map:IsEmpty(data)
     return self:Size() > 0;
 end
 
-function Map:Size(private)
+function Map:Size(data)
     local size = 0;
-    for _, _ in pairs(private.values) do
+    for _, _ in pairs(data.values) do
         size = size + 1;
     end
     return size;    
 end
 
-function Map:ToTable(private)
+function Map:ToTable(data)
     local copy = {};
 
-    for key, value in pairs(private.values) do
+    for key, value in pairs(data.values) do
         copy[key] = value;
     end
 
     return copy;
 end
 
-function Map:GetValueList(private, ...)
+function Map:GetValueList(data, ...)
     local list = List();
-    for _, value in pairs(private.values) do
+    for _, value in pairs(data.values) do
         list:Add(value);
     end
     return list;
 end
 
-function Map:GetKeyList(private, ...)
+function Map:GetKeyList(data, ...)
     local list = List();
-    for key, _ in pairs(private.values) do
+    for key, _ in pairs(data.values) do
         list:Add(key);
     end
     return list;
