@@ -1,6 +1,7 @@
 ## Interface: 70200
 ## Title: LibObjectLua
-## Version: 2.0
+## Version: 2.2
+## Note: An object-oriented framework for Lua
 
 ## initializer:
 LibStub.lua

@@ -1,6 +1,6 @@
 local addonName, Core = ...;
 
-local Lib = LibStub:NewLibrary("LibObjectLua", 2.1);
+local Lib = LibStub:NewLibrary("LibObjectLua", 2.2);
 if (not Lib) then return; end
 
 local error, assert, rawget, rawset = error, assert, rawget, rawset;
