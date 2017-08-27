@@ -17,8 +17,9 @@ end
 local Lib = LibStub:NewLibrary("LibObjectLua", 1.0);
 if (not Lib) then return; end
 
-local error, rawget, rawset = error, rawget, rawset;
-local type, setmetatable = type, setmetatable;
+local error, assert, rawget, rawset = error, assert, rawget, rawset;
+local type, setmetatable, table, string = type, setmetatable, table, string;
+local getmetatable, unpack, select = getmetatable, unpack, select;
 
 local Controllers = {};
 local ClassesImplementing = {}; -- classes that implement interfaces
@@ -49,7 +50,7 @@ function Lib:Import(namespace, silent)
     local package = Core.Packages;
     local currentNamespace = "";
 
-    local nodes = {strsplit(".", namespace)};
+    local nodes = Core:PopWrapper(strsplit(".", namespace))
     for id, key in ipairs(nodes) do
 
         Core:Assert(not Core:IsStringNilOrWhiteSpace(key), "Import - bad argument #1 (invalid entity name).");
@@ -86,7 +87,7 @@ function Lib:Export(namespace, ...)
 
     Core:Assert(not Core:IsStringNilOrWhiteSpace(namespace), "Export - bad argument #1 (invalid namespace)");
 
-    for id, key in ipairs({strsplit(".", namespace)}) do        
+    for id, key in Core:IterateArgs(strsplit(".", namespace)) do        
         Core:Assert(not Core:IsStringNilOrWhiteSpace(key), "Export - bad argument #1 (invalid namespace).");
         key = key:gsub("%s+", "");
 
@@ -101,7 +102,7 @@ function Lib:Export(namespace, ...)
         end
     end
 
-    for id, subPackage in ipairs({...}) do
+    for id, subPackage in Core:IterateArgs(...) do
         local controller = Core:GetController(subPackage);    
         Core:Assert(controller, "Export - bad argument #%s (invalid package).", id + 1);
 
@@ -167,9 +168,9 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
         end
         
         definition, message = Core:GetReturnsDefinition(proxyFunc);
-        local returnValues =  { 
+        local returnValues =  Core:PopWrapper(
             Core:ValidateFunction(definition, message, proxyFunc.Object[proxyFunc.Key](proxyFunc.Instance, proxyFunc.Private, ...)) 
-        };
+        );
 
         if (proxyFunc.Key ~= "Destroy") then
             Core:GetController(proxyFunc.Instance).UsingChild = nil;
@@ -177,7 +178,7 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
 
         ProxyStack:Push(proxyFunc);       
 
-        return unpack(returnValues);
+        return Core:UnpackWrapper(returnValues);
     end
 
     ProxyStack.FuncStrings[tostring(proxyFunc.Run)] = proxyFunc;
@@ -479,7 +480,7 @@ function Core:SetInterfaces(controller, ...)
 	controller.Interfaces = {};    
     controller.ImplementFunctions = {};
 
-    for id, interface in ipairs({...}) do
+    for id, interface in self:IterateArgs(...) do
         if (type(interface) == "string") then
             interface = Lib:Import(interface);
         end
@@ -554,7 +555,7 @@ end
 function Core:PathExists(root, path)
     self:Assert(root, "Core.PathExists - bad argument #1 (invalid root).");
 
-    for _, key in ipairs({strsplit(".", path)}) do
+    for _, key in self:IterateArgs(strsplit(".", path)) do
         if (not root[key]) then
             return false;
         end
@@ -587,7 +588,7 @@ function Core:DefineFunction(defTable, ...)
     local optionalFound = false;
     self:EmptyTable(defTable);
 
-    for id, valueType in ipairs({...}) do  
+    for id, valueType in self:IterateArgs(...) do  
         if (not self:IsStringNilOrWhiteSpace(valueType)) then    
             valueType = valueType:gsub("%s+", ""); 
 
@@ -749,4 +750,58 @@ function Core:GetArgType(arg)
 
         return "table";
     end    
+end
+
+do
+    local wrappers = {};
+
+    local function iter(wrapper, id)
+        id = id + 1;
+        local arg = wrapper[id];
+
+        if (arg) then
+            return id, arg;
+        else
+            Core:PushWrapper(wrapper);
+        end
+    end
+
+    function Core:PopWrapper(...)
+        local wrapper;
+
+        if (#wrappers > 0) then
+            wrapper = wrappers[#wrappers];
+            wrappers[#wrappers] = nil;
+        else
+            wrapper = {};
+        end
+
+        Core:EmptyTable(wrapper);
+
+        local id = 1;
+        local arg = (select(id, ...));
+        repeat
+            -- fill wrapper
+            wrapper[id] = arg;
+            id = id + 1;
+            arg = (select(id, ...));
+        until (not arg);
+
+        return wrapper;
+    end
+
+    function Core:PushWrapper(wrapper)
+        Core:EmptyTable(wrapper);
+        table.insert(wrappers, wrapper);
+    end
+
+    function Core:UnpackWrapper(wrapper)
+        table.insert(wrappers, wrapper);        
+        return unpack(wrapper);
+    end
+
+    function Core:IterateArgs(...)
+        local wrapper = self:PopWrapper(...);
+        return iter, wrapper, 0;
+    end
 end

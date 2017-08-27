@@ -367,10 +367,7 @@ function UsingParent_Test1()
     assert(instance:Parent():Parent():Print() == "This is Parent!");
     assert(instance:Parent():Parent():Parent():Print() == "This is SuperParent!");
 
-    --local super = SuperParent();
-    --super:Print();
-    --print(Core:GetController(super).UsingChild);
-    --print(Parent:Print())
+    -- print(SuperChild:Print()) -- fails as expected
 
 	print("UsingParent_Test1 Successful!");
 end
