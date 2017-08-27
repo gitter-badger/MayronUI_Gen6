@@ -57,13 +57,10 @@ function Map:RetainAll(data, keys)
     end    
 end
 
-function Map:RemoveByValue(data, value, allValues)
+function Map:RemoveByValue(data, value)
     for key, value2 in pairs(data.values) do
         if (value2 == value) then
             data.values[key] = nil;
-            if (not allValues) then
-                break;
-            end
         end
     end
 end
@@ -73,7 +70,13 @@ function Map:Get(data, key)
 end
 
 function Map:Contains(data, value)
-    return (self:GetByValue(value)) ~= nil;
+    for key, _ in pairs(data.values) do
+        if (data.values[key] == value) then
+            return true;
+        end
+    end
+
+    return false;
 end
 
 function Map:ForEach(data, func)
@@ -109,7 +112,7 @@ function Map:Empty(data)
 end
 
 function Map:IsEmpty(data)
-    return self:Size() > 0;
+    return self:Size() == 0;
 end
 
 function Map:Size(data)

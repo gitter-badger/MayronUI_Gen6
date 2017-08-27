@@ -29,6 +29,7 @@ function List:RemoveByValue(data, value, allValues)
     while (value2) do
         if (value2 == value) then
             self:Remove(index);
+
             if (not allValues) then
                 break;
             end
@@ -106,7 +107,7 @@ function List:Empty(data)
 end
 
 function List:IsEmpty(data)
-    return #data.values > 0;
+    return #data.values == 0;
 end
 
 function List:Size(data)

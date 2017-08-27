@@ -372,6 +372,80 @@ function UsingParent_Test1()
 	print("UsingParent_Test1 Successful!");
 end
 
+function List_Test1()
+	print("List_Test1 Started");
+    local Collections = lib:Import("Framework.Collections");
+
+    local List = Collections:Get("List");
+
+    local list1 = List(1, 2, 3, 4);
+
+    --list1:ForEach(function(_, value) print(value) end);
+
+    list1:Add(200);
+    list1:AddAll(100, 300, 300, 500);
+    list1:Remove(1);
+
+    list1:RemoveByValue(300);
+    assert(list1:Contains(300));
+
+    list1:RemoveByValue(300, true);
+    assert(not list1:Contains(300));
+
+    assert(not list1:IsEmpty());
+    assert(list1:Size() == 6);
+
+    list1:Empty();
+
+    assert(list1:IsEmpty());
+    assert(list1:Size() == 0);
+
+    print("List_Test1 Successful!");
+end
+
+function Map_Test1()
+	print("Map_Test1 Started");
+    local Map = lib:Import("Framework.Collections.Map");
+
+    local map1 = Map({
+        ["Warrior"] = 1,
+        ["Shaman"] = 2,
+        ["Rogue"] = 2,
+        ["Warlock"] = 4,
+    });
+
+    --map1:ForEach(function(_, value) print(value) end);
+
+    map1:Add("Druid", 5);
+    map1:AddAll({
+        ["Priest"] = 6,
+        ["DeathKnight"] = 7,
+        ["Monk"] = 8
+    });
+
+    map1:Remove("Warrior");
+
+    map1:RemoveByValue(2);
+    assert(not map1:Contains("Rogue"));
+    assert(not map1:Contains("Shaman"));
+
+    assert(not map1:IsEmpty());
+    assert(map1:Size() == 5);
+
+    local list1 = map1:GetKeyList();
+
+    assert(list1:GetObjectType() == "List");
+    assert(list1:Size() == 5);
+
+    --list:ForEach(function(_, key) print(key) end);
+
+    map1:Empty();
+    assert(map1:IsEmpty());
+    assert(map1:Size() == 0);
+
+    print("Map_Test1 Successful!");
+end
+
 ---------------------------------
 -- Run Tests:
 ---------------------------------
@@ -386,3 +460,5 @@ Interfaces_Test2();
 DefineParams_Test2();
 Inheritance_Test2();
 UsingParent_Test1();
+List_Test1();
+Map_Test1();
