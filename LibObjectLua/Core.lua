@@ -40,7 +40,7 @@ function Lib:CreatePackage(packageName, namespace)
     local newPackage = Package(packageName);
 
     if (not Core:IsStringNilOrWhiteSpace(namespace)) then
-        self:Export(namespace, newPackage);
+        self:Export(newPackage, namespace);
     end
 
     return newPackage;   
@@ -80,38 +80,35 @@ function Lib:Import(namespace, silent)
     return package;
 end
 
--- exporting packages only
-function Lib:Export(namespace, ...)
-    local package = Core.Packages;
-    local controller;
+function Lib:Export(package, namespace)
+    local controller = Core:GetController(package);
+    local parentPackage;
 
-    Core:Assert(not Core:IsStringNilOrWhiteSpace(namespace), "Export - bad argument #1 (invalid namespace)");
+    Core:Assert(not Core:IsStringNilOrWhiteSpace(namespace), 
+        "Export - bad argument #2 (invalid namespace)");
 
-    for id, key in Core:IterateArgs(strsplit(".", namespace)) do        
-        Core:Assert(not Core:IsStringNilOrWhiteSpace(key), "Export - bad argument #1 (invalid namespace).");
+    Core:Assert(controller and controller.IsPackage, 
+        "Export - bad argument #1 (package expected)");
+
+    for id, key in Core:IterateArgs(strsplit(".", namespace)) do 
+
+        Core:Assert(not Core:IsStringNilOrWhiteSpace(key),
+            "Export - bad argument #2 (invalid namespace).");
+
         key = key:gsub("%s+", "");
 
         if (id > 1) then
-            if (not package:Get(key)) then
-                package:AddSubPackage(Lib:CreatePackage(key));
+            if (not parentPackage:Get(key)) then
+                parentPackage:AddSubPackage(Lib:CreatePackage(key));
             end
-            package = package:Get(key);
+            parentPackage = parentPackage:Get(key);
         else
-            package[key] = package[key] or Lib:CreatePackage(key);
-            package = package[key];
+            Core.Packages[key] = Core.Packages[key] or Lib:CreatePackage(key);
+            parentPackage = Core.Packages[key];
         end
     end
 
-    for id, subPackage in Core:IterateArgs(...) do
-        local controller = Core:GetController(subPackage);    
-        Core:Assert(controller, "Export - bad argument #%s (invalid package).", id + 1);
-
-        if (controller.IsPackage) then
-            package:AddSubPackage(subPackage);
-        else
-            Core:Error("Export - bad argument #%s (package expected).", id + 1);
-        end
-    end
+    parentPackage:AddSubPackage(package);        
 end
 
 function Lib:SetSilentErrors(silent)

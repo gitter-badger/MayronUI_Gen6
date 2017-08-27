@@ -162,7 +162,7 @@ function ImportPackage_Test1()
     print("ImportPackage_Test1 Started");
 
     local TestPackage = lib:CreatePackage("ImportPackage_Test1");
-    lib:Export("Test", TestPackage); -- same as: lib:CreatePackage("ImportPackage_Test1", "Test");
+    lib:Export(TestPackage, "Test"); -- same as: lib:CreatePackage("ImportPackage_Test1", "Test");
     
     local CheckButton   = TestPackage:CreateClass("CheckButton");
     local Button        = TestPackage:CreateClass("Button");
