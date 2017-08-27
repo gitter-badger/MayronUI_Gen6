@@ -1,40 +1,29 @@
 local addonName, Core = ...;
 
-_G["SLASH_RELOADUI1"] = "/rl";
-SlashCmdList.RELOADUI = ReloadUI;
-
-_G["SLASH_FRAMESTK1"] = "/fs";
-SlashCmdList.FRAMESTK = function()
-    LoadAddOn('Blizzard_DebugTools');
-    FrameStackTooltip_Toggle();
-end
-
-for i = 1, NUM_CHAT_WINDOWS do
-    _G["ChatFrame"..i.."EditBox"]:SetAltArrowKeyMode(false);
-end
---------------------------------------------
---------------------------------------------
-local Lib = LibStub:NewLibrary("LibObjectLua", 2.0);
+local Lib = LibStub:NewLibrary("LibObjectLua", 2.1);
 if (not Lib) then return; end
 
 local error, assert, rawget, rawset = error, assert, rawget, rawset;
 local type, setmetatable, table, string = type, setmetatable, table, string;
 local getmetatable, unpack, select = getmetatable, unpack, select;
 
-local Controllers = {};
-local ClassesImplementing = {}; -- classes that implement interfaces
+local Controllers = {}; -- meta-data for objects and interfaces.
+local ClassesImplementing = {}; -- a list of classes that implement interfaces.
 
-local ProxyStack = {};
-ProxyStack.FuncStrings = {};
+local ProxyStack = {}; -- handles parameter and return value validation when executing functions.
+ProxyStack.FuncStrings = {}; -- contains functions converted to strings to track function locations when inheritance is used.
 
 Core.Lib = Lib;
 Core.PREFIX = "|cffffcc00LibObjectLua: |r";
 Core.Controllers = Controllers;
-Core.Packages = {};
+Core.Packages = {}; -- contains all packages exported.
 
 --------------------------------------------
 -- LibObjectLua Functions
 --------------------------------------------
+-- @param packageName (string) - the name of the package.
+-- @param namespace (string) - the parent package namespace. Example: "Framework.System.Package".
+-- @return package (Package) - returns a package object.
 function Lib:CreatePackage(packageName, namespace)
     local Package = Lib:Import("Framework.System.Package");
     local newPackage = Package(packageName);
@@ -46,6 +35,10 @@ function Lib:CreatePackage(packageName, namespace)
     return newPackage;   
 end
 
+-- @param namespace (string) - the entity namespace (required for locating it).
+--      (an entity = a package, class or interface).
+-- @param silent (boolean) - if true, no error will be triggered if the entity cannot be found.
+-- @return entity (Package, or class/interface) - returns the found entity (or false if silent).
 function Lib:Import(namespace, silent)
     local package = Core.Packages;
     local currentNamespace = "";
@@ -80,6 +73,8 @@ function Lib:Import(namespace, silent)
     return package;
 end
 
+-- @param package (Package) - a package instance object.
+-- @param namespace (string) - the package namespace (required for locating and importing it).
 function Lib:Export(package, namespace)
     local controller = Core:GetController(package);
     local parentPackage;
@@ -111,21 +106,25 @@ function Lib:Export(package, namespace)
     parentPackage:AddSubPackage(package);        
 end
 
+-- @param silent (boolean) - true if errors should be cause in the error log instead of triggering.
 function Lib:SetSilentErrors(silent)
     Core.silent = silent;
 end
 
+-- @return errorLog (table) - contains index/string pairs of errors caught while in silent mode.
 function Lib:GetErrorLog()
     Core.errorLog = Core.errorLog or {};
     return Core.errorLog;
 end
 
+-- empties the error log table.
 function Lib:FlushErrorLog()
     if (Core.errorLog) then
         Core:EmptyTable(Core.errorLog);
     end
 end
 
+-- @return numErrors (number) - the total number of errors caught while in silent mode.
 function Lib:GetNumErrors()
     return (Core.errorLog and #Core.errorLog) or 0;
 end
@@ -133,7 +132,13 @@ end
 -------------------------------------
 -- ProxyStack
 -------------------------------------
-function ProxyStack:Pop(proxyEntity, key, object, controller) 
+-- intercepts function calls on classes and instance objects and returns a proxy function used for validation. 
+-- @param proxyEntity (table) - a table containing all functions assigned to a class or interface.
+-- @param key (string) - the function name/key being called.
+-- @param entity (table) - the instance or class object originally being called with the function name/key.
+-- @param controller (table) - the entities meta-data (stores validation rules and more).
+-- @return proxyFunc (function) - the proxy function is returned and called instead of the real function.
+function ProxyStack:Pop(proxyEntity, key, entity, controller) 
     local proxyFunc;
    
     if (#self == 0) then   
@@ -145,8 +150,8 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
 
     proxyFunc.Object        = proxyEntity;
     proxyFunc.Key           = key;
-    proxyFunc.Instance      = object;
-    proxyFunc.Private       = controller.PrivateInstanceData[tostring(object)];
+    proxyFunc.Self          = entity;
+    proxyFunc.Private       = controller.PrivateInstanceData[tostring(entity)];
     proxyFunc.Controller    = controller;
 
     proxyFunc.Run = proxyFunc.Run or function(_, ...)    
@@ -166,11 +171,11 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
         
         definition, message = Core:GetReturnsDefinition(proxyFunc);
         local returnValues =  Core:PopWrapper(
-            Core:ValidateFunction(definition, message, proxyFunc.Object[proxyFunc.Key](proxyFunc.Instance, proxyFunc.Private, ...)) 
+            Core:ValidateFunction(definition, message, proxyFunc.Object[proxyFunc.Key](proxyFunc.Self, proxyFunc.Private, ...)) 
         );
 
         if (proxyFunc.Key ~= "Destroy") then
-            Core:GetController(proxyFunc.Instance).UsingChild = nil;
+            Core:GetController(proxyFunc.Self).UsingChild = nil;
         end
 
         ProxyStack:Push(proxyFunc);       
@@ -183,18 +188,23 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
     return proxyFunc.Run;
 end
 
+-- Pushes the proxy function back into the stack object once no longer needed.
+-- Also, resets the state of the proxy function for future use.
+-- @param proxyFunc (function) - a proxy function returned from ProxyStack:Pop();
 function ProxyStack:Push(proxyFunc)
     self[#self + 1] = proxyFunc;
 
     proxyFunc.Object        = nil;
     proxyFunc.Key           = nil;
-    proxyFunc.Instance      = nil;
+    proxyFunc.Self          = nil;
     proxyFunc.Private       = nil;
     proxyFunc.Controller    = nil;
 
     ProxyStack.FuncStrings[tostring(proxyFunc.Run)] = nil;
 end
 
+-- @param func (function) - converts function to string to be used as a key to access the corresponding proxy function.
+-- @return proxyFunc (function) - the proxy function (called instead of real functions for validation).
 function ProxyStack:Get(func)
     return ProxyStack.FuncStrings[tostring(func)];
 end
@@ -202,6 +212,8 @@ end
 -------------------------------------
 -- Events
 -------------------------------------
+-- Only executed once when the game starts-up.
+-- Checks if all interfaces have been successfully implemented by classes using them.
 local frame = CreateFrame("Frame");
 frame:RegisterEvent("ADDON_LOADED");
 
@@ -233,9 +245,9 @@ frame:SetScript("OnEvent", function(self, _, otherAddonName)
     end
 end);
 
--------------------------------------
--- Core Functions
--------------------------------------
+-----------------------------------------------------
+-- Core Functions (not accessible outside of AddOn)
+-----------------------------------------------------
 function Core:CreateClass(packageData, className, parentClass, ...)
     local Class = {};
     local Controller = {}; -- behind the scenes controller
@@ -260,7 +272,7 @@ function Core:CreateClass(packageData, className, parentClass, ...)
     Controller.IsPackage = not packageData;
 	
     self:SetParentClass(Controller, parentClass);
-	self:SetInterfaces(Controller, ...);    
+    self:SetInterfaces(Controller, ...);    
 
     InstanceMT.Class = Class;
 
@@ -273,9 +285,9 @@ function Core:CreateClass(packageData, className, parentClass, ...)
             value = Class[key];
 
             if (type(value) == "function") then                
-                local proxy = ProxyStack:Get(value);
-                proxy.Instance = instance;
-                proxy.Private = Controller.PrivateInstanceData[tostring(instance)];  
+                local proxyFunc = ProxyStack:Get(value);
+                proxyFunc.Self = instance;
+                proxyFunc.Private = Controller.PrivateInstanceData[tostring(instance)];  
             end
         end
         
@@ -340,15 +352,15 @@ function Core:CreateClass(packageData, className, parentClass, ...)
             value = (Controller.ParentClass and Controller.ParentClass[key]) or nil;
 
             if (type(value) == "function") then
-                local proxy = ProxyStack:Get(value);
-                proxy.Instance = class;
+                local proxyFunc = ProxyStack:Get(value);
+                proxyFunc.Self = class;
             end
         end
 
         if (child and type(value) == "function") then
-            local proxy = ProxyStack:Get(value);
+            local proxyFunc = ProxyStack:Get(value);
             local childController = Core:GetController(child);    
-            proxy.Private = childController.PrivateInstanceData[tostring(child)];
+            proxyFunc.Private = childController.PrivateInstanceData[tostring(child)];
         end 
 
         return value;
