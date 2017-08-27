@@ -53,6 +53,14 @@ function Object:Equals(data, other)
 	return true;
 end
 
+function Object:Parent(data)
+    local controller = Core:GetController(self);
+	local parentController = Core:GetController(controller.ParentClass);
+	parentController.UsingChild = controller.UsingChild or self;
+
+    return controller.ParentClass;
+end
+
 function Object:GetParentClass(data)
 	return Core:GetController(self).ParentClass;
 end

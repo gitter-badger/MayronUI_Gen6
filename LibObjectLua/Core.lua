@@ -151,7 +151,7 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
     proxyFunc.Private       = controller.PrivateInstanceData[tostring(object)];
     proxyFunc.Controller    = controller;
 
-    proxyFunc.Run = function(_, ...)    
+    proxyFunc.Run = proxyFunc.Run or function(_, ...)    
         local definition, message = Core:GetParamsDefinition(proxyFunc);    
         Core:ValidateFunction(definition, message, ...);
 
@@ -160,7 +160,7 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
             if (proxyFunc.Controller.IsInterface) then
                 Core:Error("%s.%s is an interface function and must be implemented and invoked by an instance object.", 
                         proxyFunc.Controller.EntityName, proxyFunc.Key);
-            else
+            else  
                 Core:Error("%s.%s is a non static function and must be invoked by an instance object.", 
                         proxyFunc.Controller.EntityName, proxyFunc.Key);
             end
@@ -171,7 +171,11 @@ function ProxyStack:Pop(proxyEntity, key, object, controller)
             Core:ValidateFunction(definition, message, proxyFunc.Object[proxyFunc.Key](proxyFunc.Instance, proxyFunc.Private, ...)) 
         };
 
-        ProxyStack:Push(proxyFunc);
+        if (proxyFunc.Key ~= "Destroy") then
+            Core:GetController(proxyFunc.Instance).UsingChild = nil;
+        end
+
+        ProxyStack:Push(proxyFunc);       
 
         return unpack(returnValues);
     end
@@ -183,11 +187,14 @@ end
 
 function ProxyStack:Push(proxyFunc)
     self[#self + 1] = proxyFunc;
+
     proxyFunc.Object        = nil;
     proxyFunc.Key           = nil;
     proxyFunc.Instance      = nil;
     proxyFunc.Private       = nil;
     proxyFunc.Controller    = nil;
+
+    ProxyStack.FuncStrings[tostring(proxyFunc.Run)] = nil;
 end
 
 function ProxyStack:Get(func)
@@ -265,7 +272,7 @@ function Core:CreateClass(packageData, className, parentClass, ...)
         local value = ProxyInstance[key];
 
         if (not value) then
-            value = Class[key];           
+            value = Class[key];
 
             if (type(value) == "function") then                
                 local proxy = ProxyStack:Get(value);
@@ -326,18 +333,25 @@ function Core:CreateClass(packageData, className, parentClass, ...)
 
     ClassMT.__index = function(class, key)
         local value = ProxyClass[key];
-
+        local child = Controller.UsingChild;
+        
         if (type(value) == "function") then
-            value = ProxyStack:Pop(ProxyClass, key, class, Controller);        
+            value = ProxyStack:Pop(ProxyClass, key, class, Controller);
 
         elseif (not value) then
-            value = Controller.ParentClass and Controller.ParentClass[key];
+            value = (Controller.ParentClass and Controller.ParentClass[key]) or nil;
 
             if (type(value) == "function") then
                 local proxy = ProxyStack:Get(value);
-                proxy.Instance = class; -- it's a ProxyFunction
+                proxy.Instance = class;
             end
         end
+
+        if (child and type(value) == "function") then
+            local proxy = ProxyStack:Get(value);
+            local childController = Core:GetController(child);    
+            proxy.Private = childController.PrivateInstanceData[tostring(child)];
+        end 
 
         return value;
     end
@@ -557,7 +571,7 @@ function Core:GetController(entity)
 
     local metaTbl = getmetatable(entity);
 
-    if (metaTbl.Class) then
+    if (metaTbl and metaTbl.Class) then
         return Controllers[tostring(metaTbl.Class)];
     end
 

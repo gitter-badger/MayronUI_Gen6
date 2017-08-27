@@ -1,3 +1,5 @@
+local _, Core = ...;
+
 local lib = LibStub:GetLibrary("LibObjectLua");
 
 local function HelloWorld_Test1()  
@@ -326,6 +328,53 @@ function Inheritance_Test2()
 
 	print("Inheritance_Test2 Successful!");
 end
+
+function UsingParent_Test1()
+	print("UsingParent_Test1 Started");
+    local TestPackage = lib:CreatePackage("UsingParent_Test1");
+
+    local SuperParent = TestPackage:CreateClass("SuperParent");
+    local Parent = TestPackage:CreateClass("Parent", SuperParent);
+    local Child = TestPackage:CreateClass("Child", Parent);
+    local SuperChild = TestPackage:CreateClass("SuperChild", Child);
+
+    function SuperParent:Print(data)
+        --assert(data.origin == "SuperChild");
+        return "This is SuperParent!";
+    end
+
+    function Parent:Print(data)
+        return "This is Parent!";
+    end
+
+    function Child:Print(data)
+        return "This is Child!";
+    end
+
+    function SuperChild:Print(data)
+        return "This is SuperChild!";
+    end
+
+    function SuperChild:__Construct(data)
+        data.origin = "SuperChild";
+    end
+
+    local instance = SuperChild();
+    instance:Parent():Parent():Parent():Print();
+
+    assert(instance:Print() == "This is SuperChild!");
+    assert(instance:Parent():Print() == "This is Child!");
+    assert(instance:Parent():Parent():Print() == "This is Parent!");
+    assert(instance:Parent():Parent():Parent():Print() == "This is SuperParent!");
+
+    --local super = SuperParent();
+    --super:Print();
+    --print(Core:GetController(super).UsingChild);
+    --print(Parent:Print())
+
+	print("UsingParent_Test1 Successful!");
+end
+
 ---------------------------------
 -- Run Tests:
 ---------------------------------
@@ -339,3 +388,4 @@ Interfaces_Test1();
 Interfaces_Test2();
 DefineParams_Test2();
 Inheritance_Test2();
+UsingParent_Test1();

@@ -94,8 +94,6 @@ function Package:Size(data)
     return size;
 end
 
-
-
 -- Export Package manually: Cannot use Lib:Export() without Package first being established!
 Core.Packages.Framework = Package("Framework");
 
