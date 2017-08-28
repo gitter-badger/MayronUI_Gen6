@@ -8,5 +8,7 @@
 	<!-- Collections: -->
 	<Script file="Framework\Collections\List.lua" />
 	<Script file="Framework\Collections\Map.lua" />
-
+	
+	<!-- Core: -->
+	<Script file="Core.lua" />
 </Ui>

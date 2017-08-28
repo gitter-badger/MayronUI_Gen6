@@ -1,0 +1,24 @@
+## Interface: 70200
+## Title: |cff00ccffMUI|r Core
+## SavedVariables: MUIdb
+## Version: 6.0b
+## Note: Required for all MUI (MayronUI) AddOns
+
+## libs:
+Libs/LibStub.lua
+Libs/CallbackHandler-1.0.lua
+Libs/LibObjectLua-2.2/Embeds.xml
+Libs/LibMayronDb-2.5.lua
+Libs/LibEventManager-1.0.lua
+Libs/GuiBuilder-1.0.lua
+Libs/LibSharedMedia-3.0.lua
+
+Toolkit.lua
+Core.lua
+Init.lua
+
+## Modules:
+MainContainer.lua
+DataText.lua
+AfkDisplay.lua
+OrderHallCommandBar.lua
